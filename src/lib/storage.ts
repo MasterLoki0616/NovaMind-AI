@@ -3,8 +3,31 @@ import type { AppSettings, ChatMode, Conversation } from "../types/app";
 const SETTINGS_KEY = "novamind:settings";
 const CONVERSATIONS_KEY = "novamind:conversations";
 
+function getDefaultApiBaseUrl() {
+  const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL;
+  if (configuredBaseUrl) {
+    return configuredBaseUrl;
+  }
+
+  if (typeof window === "undefined") {
+    return "http://127.0.0.1:8787";
+  }
+
+  const { hostname, port, origin, protocol } = window.location;
+
+  if (protocol === "tauri:") {
+    return "http://127.0.0.1:8787";
+  }
+
+  if ((hostname === "127.0.0.1" || hostname === "localhost") && ["1420", "4173", "5173"].includes(port)) {
+    return `${protocol}//${hostname}:8787`;
+  }
+
+  return origin;
+}
+
 export const defaultSettings: AppSettings = {
-  apiBaseUrl: import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8787",
+  apiBaseUrl: getDefaultApiBaseUrl(),
   defaultModel: "gpt-4o-mini",
   temperature: 0.4,
   systemPrompt: "",

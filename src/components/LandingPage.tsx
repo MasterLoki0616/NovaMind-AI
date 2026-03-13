@@ -1,18 +1,20 @@
 import {
   ArrowRight,
   Download,
+  ExternalLink,
   FileText,
-  Github,
+  Instagram,
   Mic,
   MonitorSmartphone,
   Sparkles
 } from "lucide-react";
-import logoUrl from "../../logo.jpeg";
+import founderPhotoUrl from "../../davutbaran.jpeg";
+import logoUrl from "../../logo.png";
 import { cn } from "../lib/utils";
 import { buttonVariants } from "./ui/button";
 
-const directDownloadUrl = "/downloads/NovaMind-AI-Setup.exe";
-const repositoryUrl = "https://github.com/MasterLoki0616/NovaMind-AI";
+const directDownloadUrl = `${import.meta.env.BASE_URL}downloads/NovaMind-AI-Setup.exe`;
+const instagramUrl = "https://www.instagram.com/novamindai_tr/";
 
 const featureCards = [
   {
@@ -60,15 +62,6 @@ export function LandingPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <a
-              href={repositoryUrl}
-              target="_blank"
-              rel="noreferrer"
-              className={buttonVariants({ variant: "ghost", size: "sm" })}
-            >
-              <Github className="h-4 w-4" />
-              GitHub
-            </a>
             <a
               href={directDownloadUrl}
               download="NovaMind-AI-Setup.exe"
@@ -263,6 +256,64 @@ export function LandingPage() {
                 </article>
               );
             })}
+          </div>
+        </section>
+
+        <section className="pb-10">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+            <article className="glass-panel p-6">
+              <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Contact</div>
+              <h2 className="mt-3 font-heading text-3xl font-semibold text-white">
+                Stay connected with NovaMind AI
+              </h2>
+              <p className="mt-3 max-w-xl text-sm leading-7 text-slate-300">
+                Follow the project on Instagram for updates, launches, and new product drops.
+              </p>
+
+              <a
+                href={instagramUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-6 flex items-center justify-between rounded-[28px] border border-white/10 bg-black/25 px-5 py-4 transition hover:border-sky-400/30 hover:bg-white/[0.05]"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-sky-300">
+                    <Instagram className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-white">Instagram</div>
+                    <div className="text-sm text-slate-400">@novamindai_tr</div>
+                  </div>
+                </div>
+                <ExternalLink className="h-5 w-5 text-slate-400" />
+              </a>
+            </article>
+
+            <article className="glass-panel overflow-hidden">
+              <div className="grid h-full gap-0 md:grid-cols-[220px_minmax(0,1fr)]">
+                <div className="relative min-h-[260px] bg-slate-950">
+                  <img
+                    src={founderPhotoUrl}
+                    alt="Davut Baran Ekinci"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+
+                <div className="flex flex-col justify-center p-6">
+                  <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Creator</div>
+                  <h2 className="mt-3 font-heading text-3xl font-semibold text-white">
+                    Davut Baran Ekinci
+                  </h2>
+                  <div className="mt-2 inline-flex w-fit rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1 text-xs uppercase tracking-[0.18em] text-sky-100">
+                    Founder & Creator
+                  </div>
+                  <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300">
+                    NovaMind AI is built with a desktop-first mindset: fast access, focused chat,
+                    and practical tools that help people move from idea to action with less friction.
+                  </p>
+                </div>
+              </div>
+            </article>
           </div>
         </section>
       </div>

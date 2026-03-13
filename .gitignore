@@ -8,4 +8,5 @@ coverage
 src-tauri/target
 src-tauri/gen
 public/downloads/*.exe
+!public/downloads/NovaMind-AI-Setup.exe
 dist/downloads/*.exe

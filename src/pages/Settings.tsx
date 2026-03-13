@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { pluginRegistry } from "../plugins/builtin";
 import { getHealth } from "../services/speech";
 import type { AppSettings } from "../types/app";
+import { chatModelGroups, getChatModelOption } from "../lib/models";
 import { Badge } from "../components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
@@ -21,6 +22,7 @@ export function SettingsPage({ settings, onChange }: SettingsPageProps) {
   } | null>(null);
   const [status, setStatus] = useState<"idle" | "loading">("idle");
   const [error, setError] = useState<string | null>(null);
+  const selectedModel = getChatModelOption(settings.defaultModel);
 
   useEffect(() => {
     let active = true;
@@ -118,18 +120,44 @@ export function SettingsPage({ settings, onChange }: SettingsPageProps) {
               <div>
                 <label className="mb-2 block text-sm text-muted-foreground">Default model</label>
                 <select
+                  value={selectedModel?.id ?? "__custom__"}
+                  onChange={(event) => {
+                    if (event.target.value === "__custom__") {
+                      return;
+                    }
+
+                    onChange({
+                      ...settings,
+                      defaultModel: event.target.value
+                    });
+                  }}
+                  className="flex h-11 w-full rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-foreground outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/30"
+                >
+                  {chatModelGroups.map((group) => (
+                    <optgroup key={group.id} label={group.label}>
+                      {group.options.map((model) => (
+                        <option key={model.id} value={model.id}>
+                          {model.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                  <option value="__custom__">Custom model ID</option>
+                </select>
+                <Input
                   value={settings.defaultModel}
                   onChange={(event) =>
                     onChange({
                       ...settings,
-                      defaultModel: event.target.value as AppSettings["defaultModel"]
+                      defaultModel: event.target.value
                     })
                   }
-                  className="flex h-11 w-full rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-foreground outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/30"
-                >
-                  <option value="gpt-4o-mini">gpt-4o-mini</option>
-                  <option value="gpt-4o">gpt-4o</option>
-                </select>
+                  placeholder="Enter any OpenAI chat model"
+                  className="mt-3"
+                />
+                <p className="mt-2 text-xs leading-6 text-muted-foreground">
+                  {selectedModel?.description ?? "Using a custom model ID outside the built-in list."}
+                </p>
               </div>
               <div>
                 <label className="mb-2 block text-sm text-muted-foreground">

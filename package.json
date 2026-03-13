@@ -13,6 +13,7 @@
     "prepare:download": "node scripts/copy-installer.mjs",
     "package:windows": "npm run tauri:build && npm run prepare:download && npm run build:web",
     "preview": "vite preview",
+    "start": "node dist-server/server/index.js",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"
   },

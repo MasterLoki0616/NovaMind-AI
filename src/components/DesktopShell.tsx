@@ -1,6 +1,16 @@
-import { LoaderCircle, MonitorSmartphone, Plus, Sparkles, Upload } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import logoUrl from "../../logo.jpeg";
+import {
+  Check,
+  ChevronDown,
+  LoaderCircle,
+  MonitorSmartphone,
+  Plus,
+  Settings2,
+  Upload
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import logoUrl from "../../logo.png";
+import { chatModelGroups, getChatModelOption } from "../lib/models";
 import { parseSmartCommand } from "../lib/smartCommands";
 import {
   createConversation,
@@ -31,6 +41,7 @@ import { ChatWindow } from "./ChatWindow";
 import { CompactComposer } from "./CompactComposer";
 import { Input } from "./ui/input";
 import { ScreenCapture } from "./ScreenCapture";
+import { Textarea } from "./ui/textarea";
 
 function sortConversations(conversations: Conversation[]) {
   return [...conversations].sort(
@@ -61,7 +72,7 @@ function createScreenAssistantState() {
 const bootConversations = loadInitialConversations();
 
 export function DesktopShell() {
-  const [settings] = useState<AppSettings>(() => ({
+  const [settings, setSettings] = useState<AppSettings>(() => ({
     ...defaultSettings,
     ...loadAppSettings()
   }));
@@ -74,6 +85,15 @@ export function DesktopShell() {
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [screenAssistant, setScreenAssistant] = useState(createScreenAssistantState);
+  const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [modelMenuPosition, setModelMenuPosition] = useState({
+    top: 0,
+    left: 0,
+    width: 360
+  });
+  const modelTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const modelMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     saveAppSettings(settings);
@@ -83,12 +103,73 @@ export function DesktopShell() {
     saveConversations(conversations);
   }, [conversations]);
 
+  useEffect(() => {
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as Node;
+      const insideTrigger = modelTriggerRef.current?.contains(target);
+      const insideMenu = modelMenuRef.current?.contains(target);
+
+      if (!insideTrigger && !insideMenu) {
+        setIsModelMenuOpen(false);
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsModelMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isModelMenuOpen) {
+      return;
+    }
+
+    function updateMenuPosition() {
+      const rect = modelTriggerRef.current?.getBoundingClientRect();
+      if (!rect) {
+        return;
+      }
+
+      const width = Math.min(360, window.innerWidth - 24);
+      const left = Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12));
+
+      setModelMenuPosition({
+        top: rect.bottom + 10,
+        left,
+        width
+      });
+    }
+
+    updateMenuPosition();
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [isModelMenuOpen]);
+
   const activeConversation = useMemo(() => {
     const selected = conversations.find((conversation) => conversation.id === selectedConversationId);
     return selected ?? conversations[0] ?? null;
   }, [conversations, selectedConversationId]);
 
   const recentConversations = conversations.slice(0, 6);
+  const selectedModel = useMemo(
+    () => getChatModelOption(settings.defaultModel),
+    [settings.defaultModel]
+  );
 
   function updateConversation(
     conversationId: string,
@@ -107,6 +188,110 @@ export function DesktopShell() {
     const created = createConversation("chat");
     setConversations((current) => sortConversations([created, ...current]));
     setSelectedConversationId(created.id);
+  }
+
+  function renderModelPicker() {
+    if (!isModelMenuOpen || typeof document === "undefined") {
+      return null;
+    }
+
+    return createPortal(
+      <div className="pointer-events-none fixed inset-0 z-[140]">
+        <div
+          ref={modelMenuRef}
+          className="pointer-events-auto fixed overflow-hidden rounded-[30px] border border-white/10 bg-slate-950/95 shadow-[0_28px_80px_rgba(15,23,42,0.58)] backdrop-blur-xl"
+          style={{
+            top: modelMenuPosition.top,
+            left: modelMenuPosition.left,
+            width: modelMenuPosition.width
+          }}
+        >
+          <div className="border-b border-white/10 px-4 py-4">
+            <div className="text-[10px] uppercase tracking-[0.24em] text-slate-500">
+              Select a model
+            </div>
+            <div className="mt-2 text-sm text-slate-300">
+              Choose from the current GPT catalog or type your own model ID below.
+            </div>
+          </div>
+
+          <div className="max-h-[420px] space-y-4 overflow-y-auto px-4 py-4">
+            {chatModelGroups.map((group) => (
+              <div key={group.id}>
+                <div className="text-[10px] uppercase tracking-[0.24em] text-sky-200/70">
+                  {group.label}
+                </div>
+                <div className="mt-1 text-xs text-slate-500">{group.description}</div>
+                <div className="mt-3 space-y-2">
+                  {group.options.map((model) => {
+                    const active = settings.defaultModel === model.id;
+
+                    return (
+                      <button
+                        key={model.id}
+                        type="button"
+                        onClick={() => {
+                          setSettings((current) => ({
+                            ...current,
+                            defaultModel: model.id
+                          }));
+                          setIsModelMenuOpen(false);
+                        }}
+                        className={`w-full rounded-[22px] border px-3 py-3 text-left transition ${
+                          active
+                            ? "border-sky-400/30 bg-sky-400/10"
+                            : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium text-white">{model.label}</div>
+                            <div className="mt-1 text-xs text-slate-400">{model.id}</div>
+                            <div className="mt-2 text-xs leading-6 text-slate-300">
+                              {model.description}
+                            </div>
+                            {model.note ? (
+                              <div className="mt-2 text-[11px] text-amber-200/80">
+                                {model.note}
+                              </div>
+                            ) : null}
+                          </div>
+                          <div className="mt-0.5 shrink-0">
+                            {active ? (
+                              <div className="flex h-8 w-8 items-center justify-center rounded-full border border-sky-400/30 bg-sky-400/15 text-sky-100">
+                                <Check className="h-4 w-4" />
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="border-t border-white/10 px-4 py-4">
+            <div className="text-[10px] uppercase tracking-[0.24em] text-slate-500">
+              Custom model ID
+            </div>
+            <Input
+              value={settings.defaultModel}
+              onChange={(event) =>
+                setSettings((current) => ({
+                  ...current,
+                  defaultModel: event.target.value
+                }))
+              }
+              placeholder="Enter another model ID"
+              className="mt-3"
+            />
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
   }
 
   async function speakMessage(messageId: string, text: string) {
@@ -359,7 +544,7 @@ export function DesktopShell() {
       <div className="hero-grid absolute inset-0 opacity-50" />
 
       <div className="relative mx-auto flex h-screen max-w-[1240px] flex-col px-4 py-4 sm:px-6">
-        <header className="glass-panel flex flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-5">
+        <header className="glass-panel relative z-20 flex flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-5">
           <div className="flex items-center gap-3">
             <img
               src={logoUrl}
@@ -375,9 +560,29 @@ export function DesktopShell() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Badge className="border-sky-400/20 bg-sky-400/10 text-sky-100">
-              {settings.defaultModel}
-            </Badge>
+            <button
+              ref={modelTriggerRef}
+              type="button"
+              onClick={() => setIsModelMenuOpen((current) => !current)}
+              className="min-w-[240px] rounded-[22px] border border-white/10 bg-black/25 px-3 py-2 text-left transition hover:border-white/20 hover:bg-white/[0.05]"
+            >
+              <div className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Model</div>
+              <div className="mt-1 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium text-white">
+                    {selectedModel?.label ?? settings.defaultModel}
+                  </div>
+                  <div className="truncate text-xs text-slate-400">
+                    {selectedModel?.description ?? "Custom model ID"}
+                  </div>
+                </div>
+                <ChevronDown
+                  className={`h-4 w-4 shrink-0 text-slate-400 transition ${
+                    isModelMenuOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </div>
+            </button>
             <Badge className="border-white/10 bg-white/[0.04] text-slate-300">
               Chat + Screen + File + Voice
             </Badge>
@@ -398,7 +603,7 @@ export function DesktopShell() {
               <Badge>{conversations.length}</Badge>
             </div>
 
-            <div className="space-y-2 overflow-y-auto">
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
               {recentConversations.map((conversation) => {
                 const active = conversation.id === activeConversation?.id;
 
@@ -422,14 +627,14 @@ export function DesktopShell() {
               })}
             </div>
 
-            <div className="mt-4 rounded-[28px] border border-white/10 bg-black/25 p-4 text-sm text-slate-300">
-              <div className="mb-2 flex items-center gap-2 font-medium text-white">
-                <Sparkles className="h-4 w-4 text-sky-300" />
-                Quick actions
-              </div>
-              Stay in chat to write. Use the monitor icon for screen help and the upload icon for
-              document summaries.
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsSettingsOpen((current) => !current)}
+              className="mt-4 flex items-center gap-2 self-start rounded-full border border-white/10 bg-black/25 px-3 py-2 text-sm text-slate-300 transition hover:border-white/20 hover:bg-white/[0.05]"
+            >
+              <Settings2 className="h-4 w-4" />
+              Settings
+            </button>
           </aside>
 
           <main className="glass-panel flex min-h-0 flex-col overflow-hidden">
@@ -481,6 +686,126 @@ export function DesktopShell() {
           </main>
         </div>
       </div>
+
+      <button
+        type="button"
+        onClick={() => setIsSettingsOpen((current) => !current)}
+        className="fixed bottom-4 left-4 z-30 flex items-center gap-2 rounded-full border border-white/10 bg-slate-950/80 px-3 py-2 text-sm text-slate-200 shadow-[0_18px_44px_rgba(15,23,42,0.45)] backdrop-blur-xl transition hover:border-white/20 hover:bg-slate-900/90 lg:hidden"
+      >
+        <Settings2 className="h-4 w-4" />
+        Settings
+      </button>
+
+      {renderModelPicker()}
+
+      {isSettingsOpen ? (
+        <div className="fixed bottom-4 left-4 z-[130] w-[min(360px,calc(100vw-24px))] overflow-hidden rounded-[30px] border border-white/10 bg-slate-950/95 shadow-[0_28px_80px_rgba(15,23,42,0.58)] backdrop-blur-xl">
+          <div className="flex items-center justify-between border-b border-white/10 px-4 py-4">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.24em] text-slate-500">Settings</div>
+              <div className="mt-1 text-sm text-slate-300">Compact app controls</div>
+            </div>
+            <Button variant="secondary" size="sm" onClick={() => setIsSettingsOpen(false)}>
+              Close
+            </Button>
+          </div>
+
+          <div className="space-y-4 px-4 py-4">
+            <div>
+              <label className="mb-2 block text-xs uppercase tracking-[0.2em] text-slate-500">
+                API base URL
+              </label>
+              <Input
+                value={settings.apiBaseUrl}
+                onChange={(event) =>
+                  setSettings((current) => ({
+                    ...current,
+                    apiBaseUrl: event.target.value
+                  }))
+                }
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-xs uppercase tracking-[0.2em] text-slate-500">
+                Temperature: {settings.temperature.toFixed(1)}
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.1"
+                value={settings.temperature}
+                onChange={(event) =>
+                  setSettings((current) => ({
+                    ...current,
+                    temperature: Number(event.target.value)
+                  }))
+                }
+                className="w-full accent-teal-400"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-xs uppercase tracking-[0.2em] text-slate-500">
+                Voice
+              </label>
+              <select
+                value={settings.voiceName}
+                onChange={(event) =>
+                  setSettings((current) => ({
+                    ...current,
+                    voiceName: event.target.value as AppSettings["voiceName"]
+                  }))
+                }
+                className="flex h-11 w-full rounded-2xl border border-white/10 bg-black/20 px-4 text-sm text-foreground outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="alloy">alloy</option>
+                <option value="echo">echo</option>
+                <option value="fable">fable</option>
+                <option value="onyx">onyx</option>
+                <option value="nova">nova</option>
+                <option value="shimmer">shimmer</option>
+              </select>
+            </div>
+
+            <label className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+              <span>
+                <div className="text-sm font-medium text-white">Auto-speak</div>
+                <div className="text-xs text-slate-400">Read new answers out loud in voice mode.</div>
+              </span>
+              <input
+                type="checkbox"
+                checked={settings.voiceAutoSpeak}
+                onChange={(event) =>
+                  setSettings((current) => ({
+                    ...current,
+                    voiceAutoSpeak: event.target.checked
+                  }))
+                }
+                className="h-5 w-5 accent-teal-400"
+              />
+            </label>
+
+            <div>
+              <label className="mb-2 block text-xs uppercase tracking-[0.2em] text-slate-500">
+                System prompt
+              </label>
+              <Textarea
+                value={settings.systemPrompt}
+                onChange={(event) =>
+                  setSettings((current) => ({
+                    ...current,
+                    systemPrompt: event.target.value
+                  }))
+                }
+                placeholder="Optional guidance for how NovaMind should answer."
+                className="min-h-[120px]"
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {screenAssistant.open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md">

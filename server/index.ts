@@ -3,6 +3,9 @@ import dotenv from "dotenv";
 import express from "express";
 import multer from "multer";
 import { toFile } from "openai";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { buildSystemPrompt, type AssistantMode, type SmartCommand } from "./lib/commands.js";
 import {
   extractDocumentText,
@@ -16,6 +19,14 @@ dotenv.config();
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
 const port = Number(process.env.PORT || 8787);
+const host = process.env.HOST || "0.0.0.0";
+const currentFilePath = fileURLToPath(import.meta.url);
+const currentDirPath = path.dirname(currentFilePath);
+const staticDistCandidates = [
+  path.resolve(currentDirPath, "..", "dist"),
+  path.resolve(currentDirPath, "..", "..", "dist")
+];
+const staticDistPath = staticDistCandidates.find((candidate) => existsSync(candidate));
 
 app.use(cors());
 app.use(express.json({ limit: "20mb" }));
@@ -41,7 +52,7 @@ app.post("/api/chat/stream", async (req, res) => {
     messages: Array<{ role: "user" | "assistant"; content: string }>;
     command?: SmartCommand | null;
     mode?: AssistantMode;
-    model?: "gpt-4o" | "gpt-4o-mini";
+    model?: string;
     temperature?: number;
     systemPrompt?: string;
   } = req.body;
@@ -108,7 +119,7 @@ app.post("/api/vision/analyze", async (req, res) => {
   }: {
     imageDataUrl?: string;
     prompt?: string;
-    model?: "gpt-4o" | "gpt-4o-mini";
+    model?: string;
   } = req.body;
 
   if (!imageDataUrl) {
@@ -154,7 +165,7 @@ app.post("/api/vision/analyze", async (req, res) => {
 
 app.post("/api/documents/upload", upload.single("file"), async (req, res) => {
   const file = req.file;
-  const model = (req.body.model || "gpt-4o-mini") as "gpt-4o" | "gpt-4o-mini";
+  const model = String(req.body.model || "gpt-4o-mini");
 
   if (!file) {
     res.status(400).json({ error: "Document file is required." });
@@ -204,7 +215,7 @@ app.post("/api/documents/ask", async (req, res) => {
   }: {
     documentText?: string;
     question?: string;
-    model?: "gpt-4o" | "gpt-4o-mini";
+    model?: string;
   } = req.body;
 
   if (!documentText?.trim() || !question?.trim()) {
@@ -300,6 +311,18 @@ app.post("/api/speech/tts", async (req, res) => {
   }
 });
 
-app.listen(port, () => {
-  console.log(`NovaMind AI API listening on http://127.0.0.1:${port}`);
+if (staticDistPath) {
+  app.use(express.static(staticDistPath));
+  app.get("*", (req, res, next) => {
+    if (req.path.startsWith("/api/")) {
+      next();
+      return;
+    }
+
+    res.sendFile(path.join(staticDistPath, "index.html"));
+  });
+}
+
+app.listen(port, host, () => {
+  console.log(`NovaMind AI listening on http://${host}:${port}`);
 });

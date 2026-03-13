@@ -8,7 +8,7 @@ export type PageId =
 
 export type ChatMode = "chat" | "code" | "voice";
 export type SmartCommand = "summarize" | "explain" | "rewrite" | "translate" | "code";
-export type ModelName = "gpt-4o" | "gpt-4o-mini";
+export type ModelName = string;
 export type TtsVoice = "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";
 
 export interface ChatMessage {
