@@ -10,6 +10,8 @@
     "build": "npm run build:web && npm run build:server",
     "build:web": "tsc -b && vite build",
     "build:server": "tsc -p tsconfig.server.json",
+    "prepare:download": "node scripts/copy-installer.mjs",
+    "package:windows": "npm run tauri:build && npm run prepare:download && npm run build:web",
     "preview": "vite preview",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"

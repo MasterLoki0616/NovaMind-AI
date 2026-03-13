@@ -7,3 +7,5 @@ dist-server
 coverage
 src-tauri/target
 src-tauri/gen
+public/downloads/*.exe
+dist/downloads/*.exe

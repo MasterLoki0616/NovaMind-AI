@@ -5,21 +5,21 @@
 @tailwind utilities;
 
 :root {
-  --background: 222 47% 5%;
-  --foreground: 210 40% 96%;
-  --card: 222 42% 9%;
-  --card-foreground: 210 40% 96%;
-  --primary: 173 80% 44%;
-  --primary-foreground: 222 47% 8%;
-  --secondary: 220 32% 17%;
-  --secondary-foreground: 210 40% 96%;
-  --muted: 220 24% 16%;
-  --muted-foreground: 215 18% 69%;
-  --accent: 199 89% 48%;
-  --accent-foreground: 210 40% 96%;
-  --border: 217 32% 17%;
-  --input: 217 32% 17%;
-  --ring: 173 80% 44%;
+  --background: 227 45% 7%;
+  --foreground: 210 40% 98%;
+  --card: 230 39% 10%;
+  --card-foreground: 210 40% 98%;
+  --primary: 199 93% 60%;
+  --primary-foreground: 228 42% 8%;
+  --secondary: 227 23% 18%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 229 22% 16%;
+  --muted-foreground: 218 15% 70%;
+  --accent: 282 82% 66%;
+  --accent-foreground: 210 40% 98%;
+  --border: 227 24% 18%;
+  --input: 227 24% 18%;
+  --ring: 199 93% 60%;
 }
 
 @layer base {
@@ -37,9 +37,10 @@
     @apply bg-background text-foreground antialiased;
     font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
     background-image:
-      radial-gradient(circle at top left, rgba(45, 212, 191, 0.18), transparent 28%),
-      radial-gradient(circle at top right, rgba(56, 189, 248, 0.14), transparent 24%),
-      linear-gradient(180deg, rgba(2, 6, 23, 0.98), rgba(2, 6, 23, 1));
+      radial-gradient(circle at 14% 18%, rgba(56, 189, 248, 0.2), transparent 24%),
+      radial-gradient(circle at 86% 14%, rgba(192, 132, 252, 0.18), transparent 20%),
+      radial-gradient(circle at 50% 88%, rgba(34, 211, 238, 0.14), transparent 28%),
+      linear-gradient(180deg, rgba(4, 6, 20, 0.98), rgba(2, 6, 23, 1));
   }
 
   h1,
@@ -63,11 +64,30 @@
     @apply rounded-3xl border border-white/10 bg-white/[0.045] shadow-[0_24px_90px_rgba(2,6,23,0.45)] backdrop-blur-xl;
   }
 
+  .glass-panel {
+    @apply rounded-[32px] border border-white/10 bg-white/[0.045] shadow-[0_26px_120px_rgba(2,6,23,0.55)] backdrop-blur-2xl;
+  }
+
   .subtle-grid {
     background-image:
       linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
       linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
     background-size: 32px 32px;
+  }
+
+  .hero-grid {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(circle at center, black 44%, transparent 92%);
+  }
+
+  .text-gradient {
+    background: linear-gradient(92deg, #7dd3fc 0%, #60a5fa 36%, #c084fc 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
 
   .text-balance {
@@ -86,22 +106,22 @@ body::after {
 }
 
 body::before {
-  top: 8%;
-  left: 10%;
-  width: 260px;
-  height: 260px;
+  top: 10%;
+  left: 8%;
+  width: 280px;
+  height: 280px;
   border-radius: 999px;
-  background: rgba(45, 212, 191, 0.12);
+  background: rgba(56, 189, 248, 0.12);
   animation: float 12s ease-in-out infinite;
 }
 
 body::after {
-  right: 10%;
+  right: 8%;
   bottom: 8%;
-  width: 300px;
-  height: 300px;
+  width: 320px;
+  height: 320px;
   border-radius: 999px;
-  background: rgba(56, 189, 248, 0.12);
+  background: rgba(192, 132, 252, 0.14);
   animation: float 14s ease-in-out infinite reverse;
 }
 

@@ -13,10 +13,10 @@
     "windows": [
       {
         "title": "NovaMind AI",
-        "width": 1480,
-        "height": 960,
-        "minWidth": 1160,
-        "minHeight": 760,
+        "width": 1180,
+        "height": 820,
+        "minWidth": 940,
+        "minHeight": 640,
         "resizable": true
       }
     ],
@@ -26,12 +26,12 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis"],
     "icon": [
       "icons/icon.ico",
       "icons/icon.png"
     ],
-    "shortDescription": "Your Second Brain.",
-    "longDescription": "NovaMind AI is a desktop second brain with chat, screen analysis, document intelligence, voice workflows, and a plugin-ready architecture."
+    "shortDescription": "A compact AI desktop chat companion.",
+    "longDescription": "NovaMind AI is a compact desktop assistant built around a focused chat workspace with screen capture, document uploads, and voice input."
   }
 }
