@@ -1,0 +1,124 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@400;500;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 222 47% 5%;
+  --foreground: 210 40% 96%;
+  --card: 222 42% 9%;
+  --card-foreground: 210 40% 96%;
+  --primary: 173 80% 44%;
+  --primary-foreground: 222 47% 8%;
+  --secondary: 220 32% 17%;
+  --secondary-foreground: 210 40% 96%;
+  --muted: 220 24% 16%;
+  --muted-foreground: 215 18% 69%;
+  --accent: 199 89% 48%;
+  --accent-foreground: 210 40% 96%;
+  --border: 217 32% 17%;
+  --input: 217 32% 17%;
+  --ring: 173 80% 44%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+    background-image:
+      radial-gradient(circle at top left, rgba(45, 212, 191, 0.18), transparent 28%),
+      radial-gradient(circle at top right, rgba(56, 189, 248, 0.14), transparent 24%),
+      linear-gradient(180deg, rgba(2, 6, 23, 0.98), rgba(2, 6, 23, 1));
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  ::selection {
+    background: rgba(45, 212, 191, 0.35);
+    color: white;
+  }
+}
+
+@layer utilities {
+  .panel {
+    @apply rounded-3xl border border-white/10 bg-white/[0.045] shadow-[0_24px_90px_rgba(2,6,23,0.45)] backdrop-blur-xl;
+  }
+
+  .subtle-grid {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: auto;
+  pointer-events: none;
+  filter: blur(40px);
+  z-index: -1;
+}
+
+body::before {
+  top: 8%;
+  left: 10%;
+  width: 260px;
+  height: 260px;
+  border-radius: 999px;
+  background: rgba(45, 212, 191, 0.12);
+  animation: float 12s ease-in-out infinite;
+}
+
+body::after {
+  right: 10%;
+  bottom: 8%;
+  width: 300px;
+  height: 300px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.12);
+  animation: float 14s ease-in-out infinite reverse;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.22);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.4);
+}

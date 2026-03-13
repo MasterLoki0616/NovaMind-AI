@@ -1,0 +1,37 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "NovaMind AI",
+  "version": "0.1.0",
+  "identifier": "com.novamind.ai",
+  "build": {
+    "beforeDevCommand": "npm run dev:web",
+    "beforeBuildCommand": "npm run build:web",
+    "frontendDist": "../dist",
+    "devUrl": "http://127.0.0.1:1420"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "NovaMind AI",
+        "width": 1480,
+        "height": 960,
+        "minWidth": 1160,
+        "minHeight": 760,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
+    "shortDescription": "Your Second Brain.",
+    "longDescription": "NovaMind AI is a desktop second brain with chat, screen analysis, document intelligence, voice workflows, and a plugin-ready architecture."
+  }
+}

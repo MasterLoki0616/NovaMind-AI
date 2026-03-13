@@ -1,0 +1,24 @@
+[package]
+name = "novamind_ai"
+version = "0.1.0"
+description = "NovaMind AI desktop shell"
+authors = ["OpenAI Codex"]
+edition = "2021"
+
+[package.metadata]
+product-name = "NovaMind AI"
+
+[lib]
+name = "novamind_ai_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0.3", features = [] }
+
+[dependencies]
+base64 = "0.22.1"
+image = { version = "0.25.5", default-features = false, features = ["png"] }
+screenshots = "0.8.10"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tauri = { version = "2.1.1", features = [] }
