@@ -40,6 +40,52 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
+function shouldRetryWithoutWebSearch(error: unknown) {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+
+  return (
+    message.includes("web search") ||
+    message.includes("web_search") ||
+    message.includes("not supported") ||
+    message.includes("unsupported") ||
+    message.includes("does not support")
+  );
+}
+
+async function createStreamChatCompletion(options: {
+  openai: ReturnType<typeof getOpenAIClient>;
+  model: string;
+  temperature: number;
+  messages: Array<Record<string, unknown>>;
+  webSearch: boolean;
+}) {
+  const baseRequest = {
+    model: options.model,
+    stream: true as const,
+    temperature: options.temperature,
+    messages: options.messages
+  };
+
+  try {
+    return await options.openai.chat.completions.create(
+      options.webSearch
+        ? {
+            ...baseRequest,
+            web_search_options: {
+              search_context_size: "high"
+            }
+          }
+        : baseRequest
+    );
+  } catch (error) {
+    if (options.webSearch && shouldRetryWithoutWebSearch(error)) {
+      return options.openai.chat.completions.create(baseRequest);
+    }
+
+    throw error;
+  }
+}
+
 app.post("/api/chat/stream", async (req, res) => {
   const {
     messages,
@@ -47,7 +93,9 @@ app.post("/api/chat/stream", async (req, res) => {
     mode = "chat",
     model = "gpt-4o-mini",
     temperature = 0.4,
-    systemPrompt = ""
+    systemPrompt = "",
+    webSearch = false,
+    imageDataUrl
   }: {
     messages: Array<{ role: "user" | "assistant"; content: string }>;
     command?: SmartCommand | null;
@@ -55,6 +103,8 @@ app.post("/api/chat/stream", async (req, res) => {
     model?: string;
     temperature?: number;
     systemPrompt?: string;
+    webSearch?: boolean;
+    imageDataUrl?: string;
   } = req.body;
 
   if (!Array.isArray(messages) || messages.length === 0) {
@@ -64,6 +114,33 @@ app.post("/api/chat/stream", async (req, res) => {
 
   try {
     const openai = getOpenAIClient();
+    const lastMessageIndex = messages.length - 1;
+    const modelMessages = messages.map((message, index) => {
+      if (imageDataUrl && index === lastMessageIndex && message.role === "user") {
+        const promptText =
+          typeof message.content === "string" ? message.content : JSON.stringify(message.content);
+        return {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text:
+                "The latest shared screen image is attached to this message. Analyze what is visible on the screen directly before answering.\n\nUser question:\n" +
+                promptText
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: imageDataUrl,
+                detail: "high"
+              }
+            }
+          ]
+        };
+      }
+
+      return message;
+    });
 
     res.writeHead(200, {
       "Content-Type": "text/event-stream",
@@ -71,10 +148,11 @@ app.post("/api/chat/stream", async (req, res) => {
       Connection: "keep-alive"
     });
 
-    const stream = await openai.chat.completions.create({
+    const stream = await createStreamChatCompletion({
+      openai,
       model,
-      stream: true,
       temperature,
+      webSearch: webSearch && !Boolean(imageDataUrl),
       messages: [
         {
           role: "system",
@@ -84,7 +162,7 @@ app.post("/api/chat/stream", async (req, res) => {
             userSystemPrompt: systemPrompt
           })
         },
-        ...messages
+        ...modelMessages
       ]
     });
 
@@ -203,6 +281,24 @@ app.post("/api/documents/upload", upload.single("file"), async (req, res) => {
   } catch (error) {
     res.status(500).json({
       error: error instanceof Error ? error.message : "Document analysis failed."
+    });
+  }
+});
+
+app.post("/api/documents/extract", upload.single("file"), async (req, res) => {
+  const file = req.file;
+
+  if (!file) {
+    res.status(400).json({ error: "Document file is required." });
+    return;
+  }
+
+  try {
+    const extractedText = await extractDocumentText(file);
+    res.json({ extractedText });
+  } catch (error) {
+    res.status(500).json({
+      error: error instanceof Error ? error.message : "Document extraction failed."
     });
   }
 });

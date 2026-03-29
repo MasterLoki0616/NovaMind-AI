@@ -1,4 +1,5 @@
 import type { AppSettings, ChatMode, Conversation } from "../types/app";
+import { LEGACY_DESKTOP_API_BASE_URL } from "./runtime";
 
 const SETTINGS_KEY = "novamind:settings";
 const CONVERSATIONS_KEY = "novamind:conversations";
@@ -16,7 +17,7 @@ function getDefaultApiBaseUrl() {
   const { hostname, port, origin, protocol } = window.location;
 
   if (protocol === "tauri:") {
-    return "http://127.0.0.1:8787";
+    return "";
   }
 
   if ((hostname === "127.0.0.1" || hostname === "localhost") && ["1420", "4173", "5173"].includes(port)) {
@@ -28,11 +29,17 @@ function getDefaultApiBaseUrl() {
 
 export const defaultSettings: AppSettings = {
   apiBaseUrl: getDefaultApiBaseUrl(),
+  openAiApiKey: "",
   defaultModel: "gpt-4o-mini",
   temperature: 0.4,
   systemPrompt: "",
   voiceAutoSpeak: true,
-  voiceName: "nova"
+  voiceName: "nova",
+  preferredInputDeviceId: "",
+  preferredOutputDeviceId: "",
+  inputGain: 1,
+  theme: "ai",
+  language: "en"
 };
 
 export function createConversation(mode: ChatMode): Conversation {
@@ -62,7 +69,13 @@ export function loadAppSettings(): AppSettings {
   try {
     const raw = window.localStorage.getItem(SETTINGS_KEY);
     if (!raw) return defaultSettings;
-    return { ...defaultSettings, ...JSON.parse(raw) } as AppSettings;
+    const stored = { ...defaultSettings, ...JSON.parse(raw) } as AppSettings;
+
+    if (stored.apiBaseUrl === LEGACY_DESKTOP_API_BASE_URL && protocolIsTauri()) {
+      stored.apiBaseUrl = "";
+    }
+
+    return stored;
   } catch {
     return defaultSettings;
   }
@@ -91,4 +104,12 @@ export function loadConversations(): Conversation[] {
 
 export function saveConversations(conversations: Conversation[]) {
   window.localStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(conversations));
+}
+
+function protocolIsTauri() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return window.location.protocol === "tauri:";
 }

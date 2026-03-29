@@ -10,6 +10,39 @@ export type ChatMode = "chat" | "code" | "voice";
 export type SmartCommand = "summarize" | "explain" | "rewrite" | "translate" | "code";
 export type ModelName = string;
 export type TtsVoice = "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";
+export type AppTheme = "ai" | "dark" | "light";
+export type AppLanguage = "en" | "tr";
+export type AttachmentKind =
+  | "document"
+  | "video"
+  | "image"
+  | "text"
+  | "code"
+  | "pdf"
+  | "file";
+export type AttachmentPreviewKind =
+  | "text"
+  | "code"
+  | "image"
+  | "video"
+  | "pdf"
+  | "docx"
+  | "file";
+export type AttachmentOrigin = "upload";
+
+export interface AttachmentRecord {
+  id: string;
+  kind: AttachmentKind;
+  name: string;
+  size: number;
+  mimeType: string;
+  extension?: string;
+  path?: string;
+  origin?: AttachmentOrigin;
+  previewKind?: AttachmentPreviewKind;
+  extractedText?: string;
+  durationSeconds?: number;
+}
 
 export interface ChatMessage {
   id: string;
@@ -20,6 +53,7 @@ export interface ChatMessage {
     command?: SmartCommand | null;
     copiedFromScreen?: boolean;
     source?: "chat" | "document" | "screen" | "voice";
+    attachments?: AttachmentRecord[];
   };
 }
 
@@ -34,11 +68,17 @@ export interface Conversation {
 
 export interface AppSettings {
   apiBaseUrl: string;
+  openAiApiKey: string;
   defaultModel: ModelName;
   temperature: number;
   systemPrompt: string;
   voiceAutoSpeak: boolean;
   voiceName: TtsVoice;
+  preferredInputDeviceId: string;
+  preferredOutputDeviceId: string;
+  inputGain: number;
+  theme: AppTheme;
+  language: AppLanguage;
 }
 
 export interface ScreenSelection {

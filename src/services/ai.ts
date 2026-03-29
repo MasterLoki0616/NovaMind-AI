@@ -1,4 +1,10 @@
 import type { ChatMode, DocumentRecord, ModelName, SmartCommand } from "../types/app";
+import { usesDesktopAiBridge } from "../lib/runtime";
+import {
+  desktopAnalyzeScreen,
+  desktopChatCompletionStream,
+  desktopSummarizeDocument
+} from "./desktop";
 import { fetchFormData, fetchJson, getApiUrl, safeReadError } from "./api";
 
 interface StreamChatParams {
@@ -8,7 +14,11 @@ interface StreamChatParams {
   model: ModelName;
   temperature: number;
   systemPrompt: string;
+  apiKey?: string;
   command?: SmartCommand | null;
+  webSearch?: boolean;
+  imageDataUrl?: string;
+  inputMethod?: "text" | "voice";
   signal?: AbortSignal;
   onDelta: (chunk: string) => void;
 }
@@ -20,10 +30,45 @@ export async function streamChatResponse({
   model,
   temperature,
   systemPrompt,
+  apiKey = "",
   command,
+  webSearch = false,
+  imageDataUrl,
+  inputMethod = "text",
   signal,
   onDelta
 }: StreamChatParams) {
+  console.debug("[NovaMind][streamChatResponse]", {
+    inputMethod,
+    mode,
+    messageCount: messages.length,
+    hasScreenContext: Boolean(imageDataUrl),
+    webSearch
+  });
+
+  if (usesDesktopAiBridge(baseUrl)) {
+    await desktopChatCompletionStream(
+      {
+        apiKey,
+        mode,
+        messages,
+        model,
+        temperature,
+        systemPrompt,
+        command,
+        webSearch,
+        imageDataUrl,
+        inputMethod
+      },
+      {
+        signal,
+        onDelta
+      }
+    );
+
+    return;
+  }
+
   const response = await fetch(getApiUrl(baseUrl, "/api/chat/stream"), {
     method: "POST",
     headers: {
@@ -35,7 +80,9 @@ export async function streamChatResponse({
       model,
       temperature,
       systemPrompt,
-      command
+      command,
+      webSearch,
+      imageDataUrl
     }),
     signal
   });
@@ -90,15 +137,36 @@ export async function analyzeScreenImage(
   baseUrl: string,
   imageDataUrl: string,
   prompt: string,
-  model: ModelName
+  model: ModelName,
+  apiKey = ""
 ) {
+  if (usesDesktopAiBridge(baseUrl)) {
+    const analysis = await desktopAnalyzeScreen({
+      apiKey,
+      imageDataUrl,
+      prompt,
+      model
+    });
+
+    return { analysis };
+  }
+
   return fetchJson<{ analysis: string }>(baseUrl, "/api/vision/analyze", {
     method: "POST",
     body: JSON.stringify({ imageDataUrl, prompt, model })
   });
 }
 
-export async function uploadDocument(baseUrl: string, file: File, model: ModelName) {
+export async function uploadDocument(
+  baseUrl: string,
+  file: File,
+  model: ModelName,
+  apiKey = ""
+) {
+  if (usesDesktopAiBridge(baseUrl)) {
+    return desktopSummarizeDocument(apiKey, file, model);
+  }
+
   const formData = new FormData();
   formData.append("file", file);
   formData.append("model", model);

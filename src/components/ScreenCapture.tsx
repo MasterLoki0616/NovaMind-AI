@@ -1,7 +1,8 @@
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Crosshair, Eraser, Monitor, RefreshCcw } from "lucide-react";
-import type { ScreenSelection } from "../types/app";
+import { getAppText } from "../lib/i18n";
+import type { AppLanguage, ScreenSelection } from "../types/app";
 import { Button } from "./ui/button";
 import { cn } from "../lib/utils";
 
@@ -11,6 +12,7 @@ interface ScreenCaptureProps {
   isCapturing: boolean;
   onCapture: () => void | Promise<void>;
   onSelectionChange: (selection: ScreenSelection | null) => void;
+  language?: AppLanguage;
 }
 
 interface Dimensions {
@@ -23,8 +25,10 @@ export function ScreenCapture({
   selection,
   isCapturing,
   onCapture,
-  onSelectionChange
+  onSelectionChange,
+  language = "en"
 }: ScreenCaptureProps) {
+  const text = getAppText(language);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const startPointRef = useRef<{ x: number; y: number } | null>(null);
   const [dimensions, setDimensions] = useState<Dimensions>({
@@ -83,7 +87,7 @@ export function ScreenCapture({
       <div className="flex flex-wrap items-center gap-3">
         <Button onClick={() => void onCapture()} disabled={isCapturing}>
           {imageDataUrl ? <RefreshCcw className="h-4 w-4" /> : <Monitor className="h-4 w-4" />}
-          {imageDataUrl ? "Recapture Screen" : "Capture Screen"}
+          {imageDataUrl ? text.recaptureScreen : text.captureScreen}
         </Button>
         <Button
           variant="secondary"
@@ -91,28 +95,28 @@ export function ScreenCapture({
           disabled={!selection}
         >
           <Eraser className="h-4 w-4" />
-          Clear Selection
+          {text.clearSelection}
         </Button>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Crosshair className="h-4 w-4" />
-          Drag a rectangle over the captured screen to analyze a specific region.
+          {text.dragToAnalyze}
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-3xl border border-white/10 bg-black/20">
+      <div className="overflow-hidden rounded-3xl border border-border bg-card/70">
         {!imageDataUrl ? (
           <div className="flex min-h-[420px] flex-col items-center justify-center p-8 text-center">
             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-[24px] bg-primary/12 text-primary">
               <Monitor className="h-8 w-8" />
             </div>
-            <h3 className="font-heading text-xl font-semibold">Screen selection tool</h3>
+            <h3 className="font-heading text-xl font-semibold">{text.screenSelectionTitle}</h3>
             <p className="mt-3 max-w-lg text-sm leading-7 text-muted-foreground">
-              Capture the current display, then draw a region over the preview. NovaMind will send that cropped image to the vision model and explain what it sees.
+              {text.screenSelectionDescription}
             </p>
           </div>
         ) : (
           <div
-            className="relative w-full cursor-crosshair overflow-hidden bg-slate-950"
+            className="relative w-full cursor-crosshair overflow-hidden bg-background"
             onPointerDown={(event) => {
               const point = getNaturalPoint(event);
               if (!point) return;
@@ -137,7 +141,7 @@ export function ScreenCapture({
             <img
               ref={imgRef}
               src={imageDataUrl}
-              alt="Captured screen"
+              alt={text.capturedScreenAlt}
               className="max-h-[620px] w-full object-contain"
               onLoad={(event) => {
                 setDimensions({

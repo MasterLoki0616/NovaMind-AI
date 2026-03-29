@@ -49,6 +49,54 @@ async function captureWithBrowserMedia() {
   return canvas.toDataURL("image/png");
 }
 
+export async function openLiveScreenStream() {
+  if (!navigator.mediaDevices?.getDisplayMedia) {
+    throw new Error("Live screen sharing is unavailable in this environment.");
+  }
+
+  return navigator.mediaDevices.getDisplayMedia({
+    video: {
+      frameRate: { ideal: 10, max: 15 },
+      width: { ideal: 1920 },
+      height: { ideal: 1080 }
+    },
+    audio: false
+  });
+}
+
+export async function createPreviewVideoFromStream(stream: MediaStream) {
+  const video = document.createElement("video");
+  video.srcObject = stream;
+  video.muted = true;
+  video.playsInline = true;
+
+  await new Promise<void>((resolve) => {
+    video.onloadedmetadata = () => resolve();
+  });
+
+  await video.play();
+  return video;
+}
+
+export function captureVideoFrame(video: HTMLVideoElement, maxWidth = 1440) {
+  if (!video.videoWidth || !video.videoHeight) {
+    throw new Error("The shared screen is not ready yet.");
+  }
+
+  const scale = Math.min(1, maxWidth / video.videoWidth);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+  canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Unable to read the live screen frame.");
+  }
+
+  context.drawImage(video, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/jpeg", 0.82);
+}
+
 export async function cropImageDataUrl(imageDataUrl: string, selection?: ScreenSelection | null) {
   if (!selection || selection.width <= 0 || selection.height <= 0) {
     return imageDataUrl;

@@ -3,16 +3,18 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../../lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 disabled:pointer-events-none disabled:opacity-50",
+  "button-shell inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-2xl text-sm font-medium transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 disabled:pointer-events-none disabled:opacity-50 motion-safe:transform-gpu motion-safe:hover:-translate-y-[1px]",
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow-glow hover:brightness-110 active:translate-y-px",
+          "bg-primary text-primary-foreground shadow-glow hover:brightness-[1.08] hover:shadow-[0_0_0_1px_rgba(125,211,252,0.16),0_22px_60px_rgba(2,6,23,0.48)]",
         secondary:
-          "bg-white/6 text-foreground hover:bg-white/10 border border-white/10",
-        ghost: "text-muted-foreground hover:bg-white/8 hover:text-foreground",
-        outline: "border border-white/12 bg-transparent text-foreground hover:bg-white/6"
+          "border border-border bg-card/75 text-foreground hover:border-primary/20 hover:bg-card/90 hover:shadow-[0_16px_38px_rgba(2,6,23,0.26)]",
+        ghost:
+          "text-muted-foreground hover:bg-card/80 hover:text-foreground hover:shadow-[0_12px_28px_rgba(2,6,23,0.2)]",
+        outline:
+          "border border-border bg-transparent text-foreground hover:border-primary/25 hover:bg-card/70 hover:shadow-[0_14px_32px_rgba(2,6,23,0.22)]"
       },
       size: {
         default: "h-11 px-4 py-2",
@@ -33,13 +35,17 @@ export interface ButtonProps
     VariantProps<typeof buttonVariants> {}
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, ...props }, ref) => {
+  ({ className, variant, size, children, ...props }, ref) => {
     return (
       <button
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
         {...props}
-      />
+      >
+        <span className="relative z-10 inline-flex items-center justify-center gap-2">
+          {children}
+        </span>
+      </button>
     );
   }
 );

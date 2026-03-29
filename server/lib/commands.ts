@@ -20,7 +20,7 @@ const modePrompts: Record<AssistantMode, string> = {
   code:
     "You are NovaMind AI in code-assistant mode. Optimize for correctness, debugging clarity, and maintainable code.",
   voice:
-    "You are NovaMind AI in voice mode. Use slightly shorter phrasing that sounds natural when spoken aloud."
+    "You are NovaMind AI in voice mode. Speak naturally, remember the ongoing conversation, avoid making the user repeat themselves, and keep answers concise but complete enough to feel human in a live back-and-forth. When the request depends on current technical facts, documentation, research, or literature, prefer grounded web-backed answers when tools are available."
 };
 
 export function buildSystemPrompt(options: {
