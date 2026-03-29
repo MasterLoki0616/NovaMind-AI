@@ -1,6 +1,6 @@
 [package]
 name = "novamind_ai"
-version = "0.1.0"
+version = "0.1.1"
 description = "NovaMind AI desktop shell"
 authors = ["OpenAI Codex"]
 edition = "2021"
