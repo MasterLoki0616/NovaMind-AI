@@ -9,6 +9,7 @@ import {
   ExternalLink,
   Globe,
   Instagram,
+  Linkedin,
   Mail,
   MessageSquareText,
   Mic,
@@ -25,63 +26,30 @@ import {
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import founderPhotoUrl from "../../davutbaran.jpeg";
 import logoUrl from "../../logo.png";
+import { landingContent, type LandingLanguage } from "../lib/landing-content";
 import { cn } from "../lib/utils";
 import { buttonVariants } from "./ui/button";
 
-type Feature = { icon: LucideIcon; title: string; text: string };
+const STORAGE_KEY = "novamind-landing-language";
+const INSTAGRAM_URL = "https://www.instagram.com/novamindai_tr/";
+const LINKEDIN_URL = "https://www.linkedin.com/in/davut-baran-ekinci-911417334/";
+const EMAIL_ADDRESS = "baranekinciofficial@gmail.com";
 
-const navItems = [
-  ["About", "#about"],
-  ["Features", "#features"],
-  ["FAQ", "#faq"],
-  ["Contact", "#contact"]
-] as const;
-
-const features: Feature[] = [
-  { icon: MessageSquareText, title: "Smart AI Chat", text: "Human-like conversation that stays useful." },
-  { icon: ScanSearch, title: "Screen Understanding", text: "AI sees the live context on your screen." },
-  { icon: Mic, title: "Voice Interaction", text: "Natural voice control with faster flows." },
-  { icon: BrainCircuit, title: "Memory System", text: "A second-brain layer that remembers what matters." },
-  { icon: Bot, title: "Personal Assistant", text: "A focused AI partner for daily execution." },
-  { icon: WandSparkles, title: "Project Fixing", text: "Spot issues fast and move toward a fix." },
-  { icon: Command, title: "Terminal Automation", text: "Command-safe workflows for technical users." },
-  { icon: Workflow, title: "Open & Close Apps", text: "Reduce friction across repeated routines." },
-  { icon: Code2, title: "Code Support", text: "Generate, explain, and debug faster." },
-  { icon: Zap, title: "Task Automation", text: "Delegate repetitive work and keep momentum." }
+const featureIcons: LucideIcon[] = [
+  MessageSquareText,
+  ScanSearch,
+  Mic,
+  BrainCircuit,
+  Bot,
+  WandSparkles,
+  Command,
+  Workflow,
+  Code2,
+  Zap
 ];
 
-const upcoming = [
-  ["Autonomous Agents", "Persistent AI workers that plan and report back."],
-  ["Multi-device Sync", "A continuous NovaMind experience across devices."],
-  ["Advanced Personalization", "Deeper memory, behavior, and adaptation."]
-] as const;
-
-const reasons = [
-  "Faster than generic assistants",
-  "Screen-aware intelligence",
-  "Clean premium UI",
-  "Privacy-focused direction",
-  "Automation-first product design"
-] as const;
-
-const faqs = [
-  ["What is NovaMind AI?", "NovaMind AI is a premium assistant designed to feel like your second brain for work, learning, and execution."],
-  ["When will it be available?", "The public site is live now while the product continues toward a broader release."],
-  ["Is it free?", "The plan is to make the product accessible first, then expand into premium capability tiers."],
-  ["How is it different?", "NovaMind aims to combine memory, screen understanding, voice, and automation in one cleaner experience."]
-] as const;
-
-const downloadOptions = [
-  ["Desktop", "Windows / macOS"],
-  ["App Store", "iPhone & iPad"],
-  ["Google Play", "Android"]
-] as const;
-
-const investorSignals: { icon: LucideIcon; label: string }[] = [
-  { icon: Rocket, label: "High upside" },
-  { icon: Globe, label: "Global demand" },
-  { icon: ShieldCheck, label: "Strong direction" }
-];
+const reasonIcons: LucideIcon[] = [Zap, BrainCircuit, Sparkles, ShieldCheck, Workflow];
+const investorIcons: LucideIcon[] = [Rocket, Globe, ShieldCheck];
 
 function useScrollProgress() {
   const [progress, setProgress] = useState(0);
@@ -200,8 +168,45 @@ function Intro({
 
 export function LandingPage() {
   const progress = useScrollProgress();
+  const [language, setLanguage] = useState<LandingLanguage>("en");
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const [languageOpen, setLanguageOpen] = useState(false);
+  const languageRef = useRef<HTMLDivElement | null>(null);
   useCursorGlow();
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (stored === "en" || stored === "tr") {
+      setLanguage(stored);
+    }
+  }, []);
+
+  useEffect(() => {
+    const copy = landingContent[language];
+    window.localStorage.setItem(STORAGE_KEY, language);
+    document.documentElement.lang = language;
+    document.title = copy.meta.title;
+    document.querySelector('meta[name="description"]')?.setAttribute("content", copy.meta.description);
+  }, [language]);
+
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      if (!languageRef.current?.contains(event.target as Node)) {
+        setLanguageOpen(false);
+      }
+    };
+
+    window.addEventListener("pointerdown", onPointerDown);
+    return () => window.removeEventListener("pointerdown", onPointerDown);
+  }, []);
+
+  const copy = landingContent[language];
+  const navItems = [
+    [copy.nav.about, "#about"],
+    [copy.nav.features, "#features"],
+    [copy.nav.faq, "#faq"],
+    [copy.nav.contact, "#contact"]
+  ] as const;
 
   return (
     <div className="landing-shell relative min-h-screen overflow-hidden bg-[#060816] text-white">
@@ -223,7 +228,7 @@ export function LandingPage() {
             <img src={logoUrl} alt="NovaMind AI" className="h-11 w-11 rounded-2xl border border-white/10 object-cover" />
             <div>
               <div className="text-[11px] uppercase tracking-[0.28em] text-sky-200/75">NovaMind AI</div>
-              <div className="font-heading text-sm font-semibold text-white sm:text-base">Your second brain</div>
+              <div className="font-heading text-sm font-semibold text-white sm:text-base">{copy.hero.title}</div>
             </div>
           </a>
 
@@ -236,11 +241,59 @@ export function LandingPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <div ref={languageRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setLanguageOpen((current) => !current)}
+                className="flex h-10 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 text-sm text-slate-200 transition hover:border-sky-400/25 hover:bg-white/[0.06]"
+                aria-label={copy.language.label}
+                aria-expanded={languageOpen}
+              >
+                <Globe className="h-4 w-4 text-sky-300" />
+                <span className="hidden sm:inline">
+                  {language === "en" ? copy.language.english : copy.language.turkish}
+                </span>
+                <ChevronDown className={cn("h-4 w-4 transition duration-300", languageOpen && "rotate-180")} />
+              </button>
+
+              <div
+                className={cn(
+                  "absolute right-0 top-[calc(100%+0.75rem)] w-44 rounded-2xl border border-white/10 bg-slate-950/90 p-2 shadow-[0_24px_80px_rgba(2,6,23,0.48)] backdrop-blur-2xl transition duration-300",
+                  languageOpen
+                    ? "pointer-events-auto translate-y-0 opacity-100"
+                    : "pointer-events-none -translate-y-2 opacity-0"
+                )}
+              >
+                {([
+                  ["en", copy.language.english],
+                  ["tr", copy.language.turkish]
+                ] as const).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => {
+                      setLanguage(value);
+                      setLanguageOpen(false);
+                    }}
+                    className={cn(
+                      "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition duration-200",
+                      language === value
+                        ? "bg-sky-400/12 text-white"
+                        : "text-slate-300 hover:bg-white/[0.05] hover:text-white"
+                    )}
+                  >
+                    <span>{label}</span>
+                    {language === value ? <span className="h-2 w-2 rounded-full bg-sky-300" /> : null}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <a href="#features" className={buttonVariants({ variant: "secondary", size: "sm" })}>
-              Learn More
+              {copy.actions.learnMore}
             </a>
             <a href="#investors" className={buttonVariants({ size: "sm" })}>
-              Become an Investor
+              {copy.actions.becomeInvestor}
             </a>
           </div>
         </nav>
@@ -252,35 +305,31 @@ export function LandingPage() {
             <Reveal className="space-y-8">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-xs uppercase tracking-[0.28em] text-sky-100/80">
                 <Sparkles className="h-4 w-4 text-sky-300" />
-                Premium AI startup for the future of work
+                {copy.hero.badge}
               </div>
               <div className="space-y-6">
                 <h1 className="text-balance font-heading text-5xl font-semibold leading-[0.95] text-white sm:text-6xl lg:text-7xl xl:text-[5.6rem]">
-                  Your Second Brain
-                  <span className="text-gradient mt-2 block">Powered by AI</span>
+                  {copy.hero.title}
+                  <span className="text-gradient mt-2 block">{copy.hero.titleAccent}</span>
                 </h1>
                 <p className="max-w-2xl text-base leading-8 text-slate-300 sm:text-lg">
-                  NovaMind AI is building an intelligent layer that understands your screen, listens to your voice, remembers context, and helps you move faster with elegant automation.
+                  {copy.hero.description}
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
                 <a href="#features" className={buttonVariants({ size: "lg" })}>
-                  Get Started
+                  {copy.actions.getStarted}
                   <ArrowRight className="h-4 w-4" />
                 </a>
                 <a href="#about" className={buttonVariants({ variant: "secondary", size: "lg" })}>
-                  Learn More
+                  {copy.actions.learnMore}
                 </a>
               </div>
               <div className="grid max-w-2xl gap-4 sm:grid-cols-3">
-                {[
-                  ["Screen-aware", "Live visual context"],
-                  ["Memory-backed", "Longer continuity"],
-                  ["Automation-first", "More leverage"]
-                ].map(([label, value], index) => (
-                  <Reveal key={label} delay={120 + index * 70} className="rounded-[28px] border border-white/10 bg-white/[0.04] p-4">
-                    <div className="text-xs uppercase tracking-[0.2em] text-slate-400">{label}</div>
-                    <div className="mt-3 text-sm font-medium text-white">{value}</div>
+                {copy.hero.stats.map((item, index) => (
+                  <Reveal key={item.label} delay={120 + index * 70} className="rounded-[28px] border border-white/10 bg-white/[0.04] p-4">
+                    <div className="text-xs uppercase tracking-[0.2em] text-slate-400">{item.label}</div>
+                    <div className="mt-3 text-sm font-medium text-white">{item.value}</div>
                   </Reveal>
                 ))}
               </div>
@@ -292,40 +341,40 @@ export function LandingPage() {
                   <div className="flex items-center gap-3">
                     <img src={logoUrl} alt="NovaMind AI" className="h-12 w-12 rounded-2xl border border-white/10 object-cover" />
                     <div>
-                      <div className="font-heading text-lg font-semibold text-white">NovaMind Interface</div>
-                      <div className="text-sm text-slate-400">Clean, fast, context-rich assistance</div>
+                      <div className="font-heading text-lg font-semibold text-white">{copy.hero.preview.title}</div>
+                      <div className="text-sm text-slate-400">{copy.hero.preview.subtitle}</div>
                     </div>
                   </div>
                   <div className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-emerald-200">
-                    Live concept
+                    {copy.hero.preview.status}
                   </div>
                 </div>
                 <div className="mt-5 grid gap-4 xl:grid-cols-[220px_minmax(0,1fr)]">
                   <div className="space-y-3">
-                    {["Screen help", "Voice flow", "Memory layer"].map((item) => (
+                    {copy.hero.preview.chips.map((item) => (
                       <div key={item} className="rounded-[24px] border border-white/10 bg-white/[0.04] px-4 py-4 text-sm text-slate-200">
                         {item}
                       </div>
                     ))}
                     <div className="rounded-[24px] border border-sky-400/20 bg-sky-400/10 p-4 text-sm leading-7 text-sky-50">
-                      A calmer AI product built to feel premium, capable, and always useful.
+                      {copy.hero.preview.note}
                     </div>
                   </div>
                   <div className="rounded-[30px] border border-white/10 bg-[#090d1d]/85 p-4">
                     <div className="rounded-[24px] border border-white/10 bg-white/[0.05] p-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <div className="text-xs uppercase tracking-[0.24em] text-slate-500">Session</div>
-                          <div className="mt-1 text-sm text-white">One workspace for intelligence and action</div>
+                          <div className="text-xs uppercase tracking-[0.24em] text-slate-500">{copy.hero.preview.sessionLabel}</div>
+                          <div className="mt-1 text-sm text-white">{copy.hero.preview.sessionTitle}</div>
                         </div>
                         <div className="thinking-dots" aria-hidden><span /><span /><span /></div>
                       </div>
                       <div className="mt-5 space-y-3">
                         <div className="ml-auto max-w-[78%] rounded-[24px] border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm text-white">
-                          Explain the issue, keep my context, and help me fix it.
+                          {copy.hero.preview.userMessage}
                         </div>
                         <div className="max-w-[88%] rounded-[24px] border border-white/10 bg-white/[0.06] px-4 py-3 text-sm leading-7 text-slate-200">
-                          NovaMind combines chat, voice, screen understanding, and memory so every next step feels faster.
+                          {copy.hero.preview.assistantMessage}
                         </div>
                       </div>
                     </div>
@@ -340,33 +389,46 @@ export function LandingPage() {
           <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] lg:items-center">
             <Reveal>
               <Intro
-                eyebrow="About NovaMind"
-                title="A modern AI startup built around intelligence, productivity, and future vision."
-                text="NovaMind AI is being designed as a single AI layer for thinking, doing, and automating. The goal is simple: reduce digital friction and turn intelligence into daily leverage."
+                eyebrow={copy.about.eyebrow}
+                title={copy.about.title}
+                text={copy.about.description}
               />
             </Reveal>
             <Reveal delay={100} className="grid gap-4 sm:grid-cols-2">
-              {[
-                ["AI-powered assistant", "A product direction centered on useful, action-ready intelligence."],
-                ["Productivity engine", "Built to speed up the path from idea to execution."],
-                ["Future-ready vision", "Memory, agents, sync, and advanced automation over time."],
-                ["Clear by design", "Minimal layout, premium motion, and startup-level polish."]
-              ].map(([title, text], index) => (
-                <Reveal key={title} delay={index * 70} className="rounded-[28px] border border-white/10 bg-white/[0.04] p-5">
-                  <h3 className="text-lg font-semibold text-white">{title}</h3>
-                  <p className="mt-3 text-sm leading-7 text-slate-300">{text}</p>
+              {copy.about.cards.map((item, index) => (
+                <Reveal key={item.title} delay={index * 70} className="rounded-[28px] border border-white/10 bg-white/[0.04] p-5">
+                  <h3 className="text-lg font-semibold text-white">{item.title}</h3>
+                  <p className="mt-3 text-sm leading-7 text-slate-300">{item.text}</p>
                 </Reveal>
               ))}
             </Reveal>
           </div>
         </section>
 
+        <section className="px-4 py-20 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-6xl space-y-10">
+            <Reveal>
+              <Intro eyebrow={copy.vision.eyebrow} title={copy.vision.title} text={copy.vision.description} />
+            </Reveal>
+            <div className="grid gap-4 lg:grid-cols-3">
+              {copy.vision.cards.map((item, index) => (
+                <Reveal key={item.title} delay={index * 70} className="rounded-[30px] border border-white/10 bg-white/[0.04] p-6">
+                  <div className="mb-5 inline-flex rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1 text-xs uppercase tracking-[0.18em] text-sky-100">
+                    {item.title}
+                  </div>
+                  <p className="text-sm leading-7 text-slate-300">{item.text}</p>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </section>
+
         <section id="features" className="px-4 py-20 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-6xl space-y-12">
-            <Reveal><Intro eyebrow="Core Features" title="Powerful capabilities that still feel simple and futuristic." text="Each feature is aimed at a clean, high-conversion message: NovaMind helps you understand more, move faster, and automate the repetitive parts." center /></Reveal>
+            <Reveal><Intro eyebrow={copy.features.eyebrow} title={copy.features.title} text={copy.features.description} center /></Reveal>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {features.map((feature, index) => {
-                const Icon = feature.icon;
+              {copy.features.items.map((feature, index) => {
+                const Icon = featureIcons[index];
                 return (
                   <Reveal key={feature.title} delay={index * 45} className="feature-card rounded-[30px] border border-white/10 bg-white/[0.035] p-5 sm:p-6">
                     <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-[22px] border border-white/10 bg-gradient-to-br from-sky-400/25 via-white/[0.08] to-fuchsia-500/20 text-sky-100">
@@ -385,19 +447,19 @@ export function LandingPage() {
           <div className="mx-auto max-w-6xl space-y-10">
             <Reveal>
               <Intro
-                eyebrow="Coming Soon"
-                title="The roadmap is already bigger than the first release."
-                text="NovaMind AI is growing toward agents, sync, and deeper personalization. The near future is about making the assistant feel even more continuous and more powerful."
+                eyebrow={copy.upcoming.eyebrow}
+                title={copy.upcoming.title}
+                text={copy.upcoming.description}
               />
             </Reveal>
             <div className="grid gap-4 lg:grid-cols-3">
-              {upcoming.map(([title, text], index) => (
-                <Reveal key={title} delay={index * 70} className="rounded-[30px] border border-white/10 bg-white/[0.04] p-6">
+              {copy.upcoming.items.map((item, index) => (
+                <Reveal key={item.title} delay={index * 70} className="rounded-[30px] border border-white/10 bg-white/[0.04] p-6">
                   <div className="inline-flex items-center rounded-full border border-fuchsia-400/20 bg-fuchsia-400/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-fuchsia-100">
-                    Coming Soon
+                    {copy.actions.comingSoon}
                   </div>
-                  <h3 className="mt-6 text-2xl font-semibold text-white">{title}</h3>
-                  <p className="mt-3 text-sm leading-7 text-slate-300">{text}</p>
+                  <h3 className="mt-6 text-2xl font-semibold text-white">{item.title}</h3>
+                  <p className="mt-3 text-sm leading-7 text-slate-300">{item.text}</p>
                 </Reveal>
               ))}
             </div>
@@ -412,25 +474,25 @@ export function LandingPage() {
                 <div className="relative grid gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-center">
                   <div className="space-y-5">
                     <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/20 bg-amber-400/10 px-4 py-2 text-xs uppercase tracking-[0.24em] text-amber-100">
-                      Currently Unavailable
+                      {copy.actions.currentlyUnavailable}
                     </div>
                     <h2 className="text-balance font-heading text-3xl font-semibold text-white sm:text-4xl">
-                      Download channels are designed now. Public launch is coming next.
+                      {copy.download.title}
                     </h2>
                     <p className="max-w-2xl text-sm leading-7 text-slate-300 sm:text-base sm:leading-8">
-                      Desktop and mobile releases are planned, but the buttons stay visually disabled until launch. The product direction stays visible without pretending availability.
+                      {copy.download.description}
                     </p>
                   </div>
                   <div className="grid gap-4 md:grid-cols-3">
-                    {downloadOptions.map(([label, detail], index) => (
-                      <Reveal key={label} delay={index * 70} className="rounded-[28px] border border-white/10 bg-black/25 p-5 opacity-90">
+                    {copy.download.options.map((option, index) => (
+                      <Reveal key={option.label} delay={index * 70} className="rounded-[28px] border border-white/10 bg-black/25 p-5 opacity-90">
                         <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-sky-200">
                           <Download className="h-5 w-5" />
                         </div>
-                        <div className="mt-5 text-lg font-semibold text-white">{label}</div>
-                        <div className="mt-1 text-sm text-slate-400">{detail}</div>
+                        <div className="mt-5 text-lg font-semibold text-white">{option.label}</div>
+                        <div className="mt-1 text-sm text-slate-400">{option.detail}</div>
                         <div className="mt-6 inline-flex rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs uppercase tracking-[0.18em] text-slate-300">
-                          Coming Soon
+                          {copy.actions.comingSoon}
                         </div>
                       </Reveal>
                     ))}
@@ -445,24 +507,23 @@ export function LandingPage() {
           <div className="mx-auto max-w-6xl space-y-10">
             <Reveal>
               <Intro
-                eyebrow="Why Choose Us"
-                title="Built for people who want leverage, not just answers."
-                text="NovaMind AI is aimed at users who care about speed, clarity, smarter interfaces, and AI that actually reduces friction in daily work."
+                eyebrow={copy.whyChoose.eyebrow}
+                title={copy.whyChoose.title}
+                text={copy.whyChoose.description}
               />
             </Reveal>
             <div className="grid gap-4 lg:grid-cols-5">
-              {reasons.map((reason, index) => (
+              {copy.whyChoose.reasons.map((reason, index) => {
+                const Icon = reasonIcons[index];
+                return (
                 <Reveal key={reason} delay={index * 55} className="rounded-[28px] border border-white/10 bg-white/[0.035] p-5">
                   <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-sky-200">
-                    {index === 0 && <Zap className="h-5 w-5" />}
-                    {index === 1 && <BrainCircuit className="h-5 w-5" />}
-                    {index === 2 && <Sparkles className="h-5 w-5" />}
-                    {index === 3 && <ShieldCheck className="h-5 w-5" />}
-                    {index === 4 && <Workflow className="h-5 w-5" />}
+                    <Icon className="h-5 w-5" />
                   </div>
                   <p className="text-sm leading-7 text-slate-200">{reason}</p>
                 </Reveal>
-              ))}
+                );
+              })}
             </div>
           </div>
         </section>
@@ -471,29 +532,29 @@ export function LandingPage() {
           <div className="mx-auto max-w-5xl space-y-10">
             <Reveal>
               <Intro
-                eyebrow="FAQ"
-                title="Simple answers to the first questions people usually ask."
-                text="The ambition is large, but the message stays simple: NovaMind AI is being built to feel useful immediately and more valuable over time."
+                eyebrow={copy.faq.eyebrow}
+                title={copy.faq.title}
+                text={copy.faq.description}
                 center
               />
             </Reveal>
             <div className="space-y-4">
-              {faqs.map(([question, answer], index) => (
-                <Reveal key={question} delay={index * 60}>
+              {copy.faq.items.map((item, index) => (
+                <Reveal key={item.question} delay={index * 60}>
                   <div className="overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.035]">
                     <button
                       type="button"
                       onClick={() => setOpenFaq((current) => (current === index ? null : index))}
                       className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left sm:px-6"
                     >
-                      <span className="text-base font-medium text-white sm:text-lg">{question}</span>
+                      <span className="text-base font-medium text-white sm:text-lg">{item.question}</span>
                       <span className={cn("flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] transition duration-300", openFaq === index && "rotate-180 border-sky-400/30 bg-sky-400/10 text-sky-100")}>
                         <ChevronDown className="h-4 w-4" />
                       </span>
                     </button>
                     <div className={cn("grid transition-[grid-template-rows,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]", openFaq === index ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-60")}>
                       <div className="overflow-hidden">
-                        <p className="px-5 pb-5 text-sm leading-7 text-slate-300 sm:px-6">{answer}</p>
+                        <p className="px-5 pb-5 text-sm leading-7 text-slate-300 sm:px-6">{item.answer}</p>
                       </div>
                     </div>
                   </div>
@@ -513,13 +574,13 @@ export function LandingPage() {
                     <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-slate-950 to-transparent" />
                   </div>
                   <div className="flex flex-col justify-center p-6 sm:p-8">
-                    <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Founder</div>
+                    <div className="text-xs uppercase tracking-[0.24em] text-slate-400">{copy.founder.eyebrow}</div>
                     <h2 className="mt-3 font-heading text-3xl font-semibold text-white sm:text-4xl">Davut Baran Ekinci</h2>
                     <div className="mt-3 inline-flex w-fit rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1 text-xs uppercase tracking-[0.18em] text-sky-100">
-                      Founder & Creator
+                      {copy.founder.role}
                     </div>
                     <p className="mt-5 text-sm leading-7 text-slate-300">
-                      NovaMind AI began with one belief: software should feel more alive, more useful, and more aligned with the way ambitious people actually think and build.
+                      {copy.founder.story}
                     </p>
                   </div>
                 </div>
@@ -529,53 +590,60 @@ export function LandingPage() {
             <div className="grid gap-6">
               <Reveal delay={80}>
                 <article id="contact" className="glass-panel p-6 sm:p-8">
-                  <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Contact</div>
-                  <h2 className="mt-3 font-heading text-3xl font-semibold text-white">Stay close to the build.</h2>
-                  <p className="mt-3 text-sm leading-7 text-slate-300">
-                    Follow NovaMind AI for updates, launches, partnerships, and future product drops.
-                  </p>
+                  <div className="text-xs uppercase tracking-[0.24em] text-slate-400">{copy.contact.eyebrow}</div>
+                  <h2 className="mt-3 font-heading text-3xl font-semibold text-white">{copy.contact.title}</h2>
+                  <p className="mt-3 text-sm leading-7 text-slate-300">{copy.contact.description}</p>
                   <div className="mt-6 space-y-3">
-                    <a href="https://www.instagram.com/novamindai_tr/" target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-[24px] border border-white/10 bg-white/[0.04] px-5 py-4 transition duration-300 hover:border-sky-400/30 hover:bg-white/[0.06]">
+                    <a href={INSTAGRAM_URL} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-[24px] border border-white/10 bg-white/[0.04] px-5 py-4 transition duration-300 hover:border-sky-400/30 hover:bg-white/[0.06]">
                       <div className="flex items-center gap-4">
                         <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-sky-300">
                           <Instagram className="h-5 w-5" />
                         </div>
                         <div>
-                          <div className="text-sm font-medium text-white">Instagram</div>
+                          <div className="text-sm font-medium text-white">{copy.contact.instagram}</div>
                           <div className="text-sm text-slate-400">@novamindai_tr</div>
                         </div>
                       </div>
                       <ExternalLink className="h-5 w-5 text-slate-400" />
                     </a>
-                    <div className="flex items-center justify-between rounded-[24px] border border-white/10 bg-white/[0.04] px-5 py-4">
+
+                    <a href={LINKEDIN_URL} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-[24px] border border-white/10 bg-white/[0.04] px-5 py-4 transition duration-300 hover:border-sky-400/30 hover:bg-white/[0.06]">
+                      <div className="flex items-center gap-4">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-sky-300">
+                          <Linkedin className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-white">{copy.contact.linkedin}</div>
+                          <div className="text-sm text-slate-400">Davut Baran Ekinci</div>
+                        </div>
+                      </div>
+                      <ExternalLink className="h-5 w-5 text-slate-400" />
+                    </a>
+
+                    <a href={`mailto:${EMAIL_ADDRESS}`} className="flex items-center justify-between rounded-[24px] border border-white/10 bg-white/[0.04] px-5 py-4 transition duration-300 hover:border-sky-400/30 hover:bg-white/[0.06]">
                       <div className="flex items-center gap-4">
                         <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-sky-300">
                           <Mail className="h-5 w-5" />
                         </div>
                         <div>
-                          <div className="text-sm font-medium text-white">Email</div>
-                          <div className="text-sm text-slate-400">contact@novamind.ai</div>
+                          <div className="text-sm font-medium text-white">{copy.contact.email}</div>
+                          <div className="text-sm text-slate-400">{EMAIL_ADDRESS}</div>
                         </div>
                       </div>
-                      <div className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs uppercase tracking-[0.18em] text-slate-300">
-                        Placeholder
-                      </div>
-                    </div>
+                      <ExternalLink className="h-5 w-5 text-slate-400" />
+                    </a>
                   </div>
                 </article>
               </Reveal>
 
               <Reveal delay={130}>
                 <article id="investors" className="glass-panel p-6 sm:p-8">
-                  <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Sponsors / Investors</div>
-                  <h2 className="mt-3 font-heading text-3xl font-semibold text-white">
-                    We are looking for investors who believe AI should become a daily operating layer.
-                  </h2>
-                  <p className="mt-3 text-sm leading-7 text-slate-300">
-                    NovaMind AI sits between assistant software, memory systems, automation, and premium product design. It is an early-stage bet on how personal computing will evolve.
-                  </p>
+                  <div className="text-xs uppercase tracking-[0.24em] text-slate-400">{copy.investors.eyebrow}</div>
+                  <h2 className="mt-3 font-heading text-3xl font-semibold text-white">{copy.investors.title}</h2>
+                  <p className="mt-3 text-sm leading-7 text-slate-300">{copy.investors.description}</p>
                   <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                    {investorSignals.map(({ icon: ItemIcon, label }) => {
+                    {copy.investors.signals.map((label, index) => {
+                      const ItemIcon = investorIcons[index];
                       return (
                         <div key={label} className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
                           <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-sky-200">
@@ -586,8 +654,8 @@ export function LandingPage() {
                       );
                     })}
                   </div>
-                  <a href="mailto:investors@novamind.ai?subject=NovaMind%20AI%20Investor%20Inquiry" className={cn(buttonVariants({ size: "lg" }), "mt-6 inline-flex")}>
-                    Become an Investor
+                  <a href={`mailto:${EMAIL_ADDRESS}?subject=NovaMind%20AI%20Investor%20Inquiry`} className={cn(buttonVariants({ size: "lg" }), "mt-6 inline-flex")}>
+                    {copy.actions.becomeInvestor}
                     <ArrowRight className="h-4 w-4" />
                   </a>
                 </article>
@@ -601,7 +669,7 @@ export function LandingPage() {
         <div className="mx-auto flex max-w-6xl flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="font-heading text-lg font-semibold text-white">NovaMind AI</div>
-            <div className="mt-1 text-sm text-slate-400">© 2026 NovaMind AI. Built for a future where intelligence feels native.</div>
+            <div className="mt-1 text-sm text-slate-400">{copy.footer.copyright}</div>
           </div>
           <div className="flex flex-wrap items-center gap-4 text-sm text-slate-400">
             {navItems.map(([label, href]) => (
@@ -609,9 +677,9 @@ export function LandingPage() {
                 {label}
               </a>
             ))}
-            <a href="https://www.instagram.com/novamindai_tr/" target="_blank" rel="noreferrer" className="flex items-center gap-2 transition hover:text-white">
+            <a href={INSTAGRAM_URL} target="_blank" rel="noreferrer" className="flex items-center gap-2 transition hover:text-white">
               <Instagram className="h-4 w-4" />
-              Instagram
+              {copy.footer.instagram}
             </a>
           </div>
         </div>
