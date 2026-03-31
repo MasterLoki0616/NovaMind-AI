@@ -11,6 +11,7 @@ import {
   Instagram,
   Linkedin,
   Mail,
+  Menu,
   MessageSquareText,
   Mic,
   MonitorSmartphone,
@@ -20,6 +21,7 @@ import {
   Sparkles,
   WandSparkles,
   Workflow,
+  X,
   Zap,
   type LucideIcon
 } from "lucide-react";
@@ -171,6 +173,7 @@ export function LandingPage() {
   const [language, setLanguage] = useState<LandingLanguage>("en");
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [languageOpen, setLanguageOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const languageRef = useRef<HTMLDivElement | null>(null);
   useCursorGlow();
 
@@ -200,6 +203,14 @@ export function LandingPage() {
     return () => window.removeEventListener("pointerdown", onPointerDown);
   }, []);
 
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = mobileMenuOpen ? "hidden" : previousOverflow;
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileMenuOpen]);
+
   const copy = landingContent[language];
   const navItems = [
     [copy.nav.about, "#about"],
@@ -207,6 +218,11 @@ export function LandingPage() {
     [copy.nav.faq, "#faq"],
     [copy.nav.contact, "#contact"]
   ] as const;
+  const languageOptions = [
+    ["en", copy.language.english],
+    ["tr", copy.language.turkish]
+  ] as const;
+  const mobileMenuLabel = language === "en" ? "Open navigation menu" : "Gezinme menüsünü aç";
 
   return (
     <div className="landing-shell relative min-h-screen overflow-hidden bg-[#060816] text-white">
@@ -223,12 +239,15 @@ export function LandingPage() {
       </div>
 
       <header className="fixed inset-x-0 top-4 z-40 px-3 sm:px-6">
-        <nav className="mx-auto flex w-full max-w-6xl items-center justify-between rounded-full border border-white/10 bg-slate-950/55 px-4 py-3 shadow-[0_24px_80px_rgba(2,6,23,0.42)] backdrop-blur-2xl sm:px-6">
-          <a href="#top" className="flex items-center gap-3">
+        <div className="mx-auto w-full max-w-6xl">
+          <nav className="flex w-full items-center justify-between rounded-full border border-white/10 bg-slate-950/55 px-4 py-3 shadow-[0_24px_80px_rgba(2,6,23,0.42)] backdrop-blur-2xl sm:px-6">
+          <a href="#top" className="flex min-w-0 items-center gap-3">
             <img src={logoUrl} alt="NovaMind AI" className="h-11 w-11 rounded-2xl border border-white/10 object-cover" />
-            <div>
+            <div className="min-w-0">
               <div className="text-[11px] uppercase tracking-[0.28em] text-sky-200/75">NovaMind AI</div>
-              <div className="font-heading text-sm font-semibold text-white sm:text-base">{copy.hero.title}</div>
+              <div className="truncate font-heading text-sm font-semibold text-white sm:text-base">
+                {copy.hero.title}
+              </div>
             </div>
           </a>
 
@@ -240,7 +259,7 @@ export function LandingPage() {
             ))}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="hidden items-center gap-2 lg:flex">
             <div ref={languageRef} className="relative">
               <button
                 type="button"
@@ -264,10 +283,7 @@ export function LandingPage() {
                     : "pointer-events-none -translate-y-2 opacity-0"
                 )}
               >
-                {([
-                  ["en", copy.language.english],
-                  ["tr", copy.language.turkish]
-                ] as const).map(([value, label]) => (
+                {languageOptions.map(([value, label]) => (
                   <button
                     key={value}
                     type="button"
@@ -296,36 +312,111 @@ export function LandingPage() {
               {copy.actions.becomeInvestor}
             </a>
           </div>
-        </nav>
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen((current) => !current)}
+            className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-slate-100 transition hover:border-sky-400/25 hover:bg-white/[0.06] lg:hidden"
+            aria-label={mobileMenuLabel}
+            aria-expanded={mobileMenuOpen}
+          >
+            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+          </nav>
+          <div
+            className={cn(
+              "overflow-hidden transition-[max-height,opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:hidden",
+              mobileMenuOpen
+                ? "pointer-events-auto mt-3 max-h-[calc(100svh-5.5rem)] opacity-100"
+                : "pointer-events-none max-h-0 opacity-0"
+            )}
+          >
+            <div className="glass-panel max-h-[calc(100svh-6rem)] overflow-y-auto rounded-[32px] p-4 sm:p-5">
+            <div className="grid gap-2">
+              {navItems.map(([label, href]) => (
+                <a
+                  key={href}
+                  href={href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-base text-slate-100 transition hover:border-sky-400/25 hover:bg-white/[0.06]"
+                >
+                  {label}
+                </a>
+              ))}
+            </div>
+            <div className="mt-4 rounded-[28px] border border-white/10 bg-white/[0.035] p-4">
+              <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.24em] text-slate-400">
+                <Globe className="h-4 w-4 text-sky-300" />
+                {copy.language.label}
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {languageOptions.map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => {
+                      setLanguage(value);
+                      setMobileMenuOpen(false);
+                    }}
+                    className={cn(
+                      "rounded-2xl border px-4 py-3 text-left text-sm transition duration-200",
+                      language === value
+                        ? "border-sky-400/30 bg-sky-400/12 text-white"
+                        : "border-white/10 bg-white/[0.04] text-slate-300 hover:border-sky-400/25 hover:bg-white/[0.06] hover:text-white"
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <a
+                href="#features"
+                onClick={() => setMobileMenuOpen(false)}
+                className={cn(buttonVariants({ variant: "secondary", size: "lg" }), "w-full")}
+              >
+                {copy.actions.learnMore}
+              </a>
+              <a
+                href="#investors"
+                onClick={() => setMobileMenuOpen(false)}
+                className={cn(buttonVariants({ size: "lg" }), "w-full")}
+              >
+                {copy.actions.becomeInvestor}
+              </a>
+            </div>
+            </div>
+          </div>
+        </div>
       </header>
 
       <main id="top" className="relative z-10">
-        <section className="px-4 pb-20 pt-28 sm:px-6 lg:px-8">
-          <div className="mx-auto grid min-h-[calc(100svh-7rem)] max-w-6xl items-center gap-16 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-            <Reveal className="space-y-8">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-xs uppercase tracking-[0.28em] text-sky-100/80">
+        <section className="px-4 pb-16 pt-24 sm:px-6 sm:pt-28 lg:px-8">
+          <div className="mx-auto grid min-h-[calc(100svh-6.5rem)] max-w-6xl items-center gap-12 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:gap-16">
+            <Reveal className="space-y-8 text-center lg:text-left">
+              <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-4 py-2 text-xs uppercase tracking-[0.28em] text-sky-100/80 lg:mx-0">
                 <Sparkles className="h-4 w-4 text-sky-300" />
                 {copy.hero.badge}
               </div>
               <div className="space-y-6">
-                <h1 className="text-balance font-heading text-5xl font-semibold leading-[0.95] text-white sm:text-6xl lg:text-7xl xl:text-[5.6rem]">
+                <h1 className="text-balance font-heading text-[2.85rem] font-semibold leading-[0.96] text-white sm:text-6xl lg:text-7xl xl:text-[5.6rem]">
                   {copy.hero.title}
                   <span className="text-gradient mt-2 block">{copy.hero.titleAccent}</span>
                 </h1>
-                <p className="max-w-2xl text-base leading-8 text-slate-300 sm:text-lg">
+                <p className="mx-auto max-w-2xl text-base leading-7 text-slate-300 sm:text-lg sm:leading-8 lg:mx-0">
                   {copy.hero.description}
                 </p>
               </div>
-              <div className="flex flex-wrap gap-3">
-                <a href="#features" className={buttonVariants({ size: "lg" })}>
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-center lg:justify-start">
+                <a href="#features" className={cn(buttonVariants({ size: "lg" }), "w-full sm:w-auto")}>
                   {copy.actions.getStarted}
                   <ArrowRight className="h-4 w-4" />
                 </a>
-                <a href="#about" className={buttonVariants({ variant: "secondary", size: "lg" })}>
+                <a href="#about" className={cn(buttonVariants({ variant: "secondary", size: "lg" }), "w-full sm:w-auto")}>
                   {copy.actions.learnMore}
                 </a>
               </div>
-              <div className="grid max-w-2xl gap-4 sm:grid-cols-3">
+              <div className="mx-auto grid w-full max-w-2xl gap-4 sm:grid-cols-3 lg:mx-0">
                 {copy.hero.stats.map((item, index) => (
                   <Reveal key={item.label} delay={120 + index * 70} className="rounded-[28px] border border-white/10 bg-white/[0.04] p-4">
                     <div className="text-xs uppercase tracking-[0.2em] text-slate-400">{item.label}</div>
@@ -337,15 +428,15 @@ export function LandingPage() {
 
             <Reveal delay={120} className="relative">
               <div className="glass-panel overflow-hidden p-4 sm:p-6">
-                <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                  <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-4 border-b border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-center gap-3">
                     <img src={logoUrl} alt="NovaMind AI" className="h-12 w-12 rounded-2xl border border-white/10 object-cover" />
-                    <div>
-                      <div className="font-heading text-lg font-semibold text-white">{copy.hero.preview.title}</div>
+                    <div className="min-w-0">
+                      <div className="truncate font-heading text-lg font-semibold text-white">{copy.hero.preview.title}</div>
                       <div className="text-sm text-slate-400">{copy.hero.preview.subtitle}</div>
                     </div>
                   </div>
-                  <div className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-emerald-200">
+                  <div className="w-fit rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-emerald-200">
                     {copy.hero.preview.status}
                   </div>
                 </div>
@@ -594,7 +685,7 @@ export function LandingPage() {
                   <h2 className="mt-3 font-heading text-3xl font-semibold text-white">{copy.contact.title}</h2>
                   <p className="mt-3 text-sm leading-7 text-slate-300">{copy.contact.description}</p>
                   <div className="mt-6 space-y-3">
-                    <a href={INSTAGRAM_URL} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-[24px] border border-white/10 bg-white/[0.04] px-5 py-4 transition duration-300 hover:border-sky-400/30 hover:bg-white/[0.06]">
+                    <a href={INSTAGRAM_URL} target="_blank" rel="noreferrer" className="flex flex-col gap-4 rounded-[24px] border border-white/10 bg-white/[0.04] px-5 py-4 transition duration-300 hover:border-sky-400/30 hover:bg-white/[0.06] sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-center gap-4">
                         <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-sky-300">
                           <Instagram className="h-5 w-5" />
@@ -607,7 +698,7 @@ export function LandingPage() {
                       <ExternalLink className="h-5 w-5 text-slate-400" />
                     </a>
 
-                    <a href={LINKEDIN_URL} target="_blank" rel="noreferrer" className="flex items-center justify-between rounded-[24px] border border-white/10 bg-white/[0.04] px-5 py-4 transition duration-300 hover:border-sky-400/30 hover:bg-white/[0.06]">
+                    <a href={LINKEDIN_URL} target="_blank" rel="noreferrer" className="flex flex-col gap-4 rounded-[24px] border border-white/10 bg-white/[0.04] px-5 py-4 transition duration-300 hover:border-sky-400/30 hover:bg-white/[0.06] sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-center gap-4">
                         <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-sky-300">
                           <Linkedin className="h-5 w-5" />
@@ -620,7 +711,7 @@ export function LandingPage() {
                       <ExternalLink className="h-5 w-5 text-slate-400" />
                     </a>
 
-                    <a href={`mailto:${EMAIL_ADDRESS}`} className="flex items-center justify-between rounded-[24px] border border-white/10 bg-white/[0.04] px-5 py-4 transition duration-300 hover:border-sky-400/30 hover:bg-white/[0.06]">
+                    <a href={`mailto:${EMAIL_ADDRESS}`} className="flex flex-col gap-4 rounded-[24px] border border-white/10 bg-white/[0.04] px-5 py-4 transition duration-300 hover:border-sky-400/30 hover:bg-white/[0.06] sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-center gap-4">
                         <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-sky-300">
                           <Mail className="h-5 w-5" />

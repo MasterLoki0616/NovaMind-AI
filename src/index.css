@@ -816,6 +816,26 @@ body::after {
   }
 }
 
+@media (max-width: 768px) {
+  body {
+    background-size: 180% 180%;
+  }
+
+  .landing-noise {
+    opacity: 0.035;
+  }
+
+  .hero-grid {
+    background-size: 32px 32px;
+    opacity: 0.52;
+  }
+
+  .glass-panel,
+  .panel {
+    backdrop-filter: blur(18px);
+  }
+}
+
 @media (pointer: coarse) {
   .site-cursor-glow {
     display: none;
