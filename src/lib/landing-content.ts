@@ -84,12 +84,13 @@ type LandingCopy = {
   };
   founder: {
     eyebrow: string;
+    name: string;
     role: string;
     story: string;
   };
   coFounder: {
     eyebrow: string;
-    title: string;
+    name: string;
     role: string;
     story: string;
   };
@@ -297,13 +298,14 @@ export const landingContent: Record<LandingLanguage, LandingCopy> = {
     },
     founder: {
       eyebrow: "Founder",
+      name: "Davut Baran Ekinci",
       role: "Founder & Creator",
       story:
         "NovaMind AI began with one belief: software should feel more alive, more useful, and more aligned with the way ambitious people actually think and build."
     },
     coFounder: {
       eyebrow: "Co-Founder",
-      title: "NovaMind AI Co-Founder",
+      name: "Ege Minaz",
       role: "Co-Founder",
       story:
         "NovaMind AI is also being shaped through shared ambition, fast iteration, and the belief that world-class AI products should feel clear, bold, and deeply useful from day one."
@@ -512,13 +514,14 @@ export const landingContent: Record<LandingLanguage, LandingCopy> = {
     },
     founder: {
       eyebrow: "Kurucu",
+      name: "Davut Baran Ekinci",
       role: "Kurucu & Yaratıcı",
       story:
         "NovaMind AI tek bir inançla başladı: yazılım daha canlı, daha faydalı ve insanların düşünme-biçimiyle daha uyumlu hissettirmeli."
     },
     coFounder: {
       eyebrow: "Kurucu Ortak",
-      title: "NovaMind AI Kurucu Ortağı",
+      name: "Ege Minaz",
       role: "Kurucu Ortak",
       story:
         "NovaMind AI, ortak vizyon, hızlı üretim temposu ve ilk günden itibaren net, cesur ve gerçekten faydalı bir AI ürünü ortaya koyma hedefiyle geliştiriliyor."

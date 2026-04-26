@@ -169,6 +169,39 @@ function Intro({
   );
 }
 
+function TeamMemberCard({
+  photoUrl,
+  name,
+  eyebrow,
+  role,
+  story
+}: {
+  photoUrl: string;
+  name: string;
+  eyebrow: string;
+  role: string;
+  story: string;
+}) {
+  return (
+    <article className="glass-panel overflow-hidden h-full">
+      <div className="grid h-full gap-0 md:grid-cols-[240px_minmax(0,1fr)]">
+        <div className="relative min-h-[320px] bg-slate-950">
+          <img src={photoUrl} alt={name} className="h-full w-full object-cover object-top" />
+          <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-slate-950 to-transparent" />
+        </div>
+        <div className="flex flex-col justify-center p-6 sm:p-8">
+          <div className="text-xs uppercase tracking-[0.24em] text-slate-400">{eyebrow}</div>
+          <h2 className="mt-3 font-heading text-3xl font-semibold text-white sm:text-4xl">{name}</h2>
+          <div className="mt-3 inline-flex w-fit rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1 text-xs uppercase tracking-[0.18em] text-sky-100">
+            {role}
+          </div>
+          <p className="mt-5 text-sm leading-7 text-slate-300">{story}</p>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 export function LandingPage() {
   const progress = useScrollProgress();
   const [language, setLanguage] = useState<LandingLanguage>("en");
@@ -657,52 +690,31 @@ export function LandingPage() {
         </section>
 
         <section className="px-4 py-20 sm:px-6 lg:px-8">
-          <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[minmax(0,1.02fr)_minmax(0,0.98fr)]">
-            <Reveal>
-              <article className="glass-panel overflow-hidden">
-                <div className="grid gap-0 md:grid-cols-[240px_minmax(0,1fr)]">
-                  <div className="relative min-h-[320px] bg-slate-950">
-                    <img src={founderPhotoUrl} alt="Davut Baran Ekinci" className="h-full w-full object-cover" />
-                    <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-slate-950 to-transparent" />
-                  </div>
-                  <div className="flex flex-col justify-center p-6 sm:p-8">
-                    <div className="text-xs uppercase tracking-[0.24em] text-slate-400">{copy.founder.eyebrow}</div>
-                    <h2 className="mt-3 font-heading text-3xl font-semibold text-white sm:text-4xl">Davut Baran Ekinci</h2>
-                    <div className="mt-3 inline-flex w-fit rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1 text-xs uppercase tracking-[0.18em] text-sky-100">
-                      {copy.founder.role}
-                    </div>
-                    <p className="mt-5 text-sm leading-7 text-slate-300">
-                      {copy.founder.story}
-                    </p>
-                  </div>
-                </div>
-              </article>
-            </Reveal>
-
-            <div className="grid gap-6">
-              <Reveal delay={50}>
-                <article className="glass-panel overflow-hidden">
-                  <div className="grid gap-0 sm:grid-cols-[200px_minmax(0,1fr)]">
-                    <div className="relative min-h-[280px] bg-slate-950">
-                      <img src={coFounderPhotoUrl} alt={copy.coFounder.title} className="h-full w-full object-cover object-top" />
-                      <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-slate-950 to-transparent" />
-                    </div>
-                    <div className="flex flex-col justify-center p-6 sm:p-7">
-                      <div className="text-xs uppercase tracking-[0.24em] text-slate-400">{copy.coFounder.eyebrow}</div>
-                      <h2 className="mt-3 font-heading text-2xl font-semibold text-white sm:text-3xl">{copy.coFounder.title}</h2>
-                      <div className="mt-3 inline-flex w-fit rounded-full border border-fuchsia-400/20 bg-fuchsia-400/10 px-3 py-1 text-xs uppercase tracking-[0.18em] text-fuchsia-100">
-                        {copy.coFounder.role}
-                      </div>
-                      <p className="mt-5 text-sm leading-7 text-slate-300">
-                        {copy.coFounder.story}
-                      </p>
-                    </div>
-                  </div>
-                </article>
+          <div className="mx-auto max-w-6xl space-y-6">
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Reveal>
+                <TeamMemberCard
+                  photoUrl={founderPhotoUrl}
+                  name={copy.founder.name}
+                  eyebrow={copy.founder.eyebrow}
+                  role={copy.founder.role}
+                  story={copy.founder.story}
+                />
               </Reveal>
+              <Reveal delay={50}>
+                <TeamMemberCard
+                  photoUrl={coFounderPhotoUrl}
+                  name={copy.coFounder.name}
+                  eyebrow={copy.coFounder.eyebrow}
+                  role={copy.coFounder.role}
+                  story={copy.coFounder.story}
+                />
+              </Reveal>
+            </div>
 
+            <div className="grid gap-6 lg:grid-cols-2">
               <Reveal delay={80}>
-                <article id="contact" className="glass-panel p-6 sm:p-8">
+                <article id="contact" className="glass-panel p-6 sm:p-8 h-full">
                   <div className="text-xs uppercase tracking-[0.24em] text-slate-400">{copy.contact.eyebrow}</div>
                   <h2 className="mt-3 font-heading text-3xl font-semibold text-white">{copy.contact.title}</h2>
                   <p className="mt-3 text-sm leading-7 text-slate-300">{copy.contact.description}</p>
@@ -750,7 +762,7 @@ export function LandingPage() {
               </Reveal>
 
               <Reveal delay={130}>
-                <article id="investors" className="glass-panel p-6 sm:p-8">
+                <article id="investors" className="glass-panel p-6 sm:p-8 h-full">
                   <div className="text-xs uppercase tracking-[0.24em] text-slate-400">{copy.investors.eyebrow}</div>
                   <h2 className="mt-3 font-heading text-3xl font-semibold text-white">{copy.investors.title}</h2>
                   <p className="mt-3 text-sm leading-7 text-slate-300">{copy.investors.description}</p>
