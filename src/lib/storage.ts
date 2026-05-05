@@ -29,7 +29,6 @@ function getDefaultApiBaseUrl() {
 
 export const defaultSettings: AppSettings = {
   apiBaseUrl: getDefaultApiBaseUrl(),
-  openAiApiKey: "",
   defaultModel: "gpt-4o-mini",
   temperature: 0.4,
   systemPrompt: "",
@@ -55,6 +54,7 @@ export function createConversation(mode: ChatMode): Conversation {
     id: crypto.randomUUID(),
     title,
     mode,
+    files: [],
     createdAt: timestamp,
     updatedAt: timestamp,
     messages: []

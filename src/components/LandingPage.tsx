@@ -1,13 +1,14 @@
 import {
   ArrowRight,
-  Bot,
   BrainCircuit,
   ChevronDown,
   Code2,
   Command,
   Download,
   ExternalLink,
+  FileText,
   Globe,
+  History,
   Instagram,
   Linkedin,
   Mail,
@@ -42,13 +43,11 @@ const featureIcons: LucideIcon[] = [
   MessageSquareText,
   ScanSearch,
   Mic,
-  BrainCircuit,
-  Bot,
-  WandSparkles,
-  Command,
-  Workflow,
+  FileText,
   Code2,
-  Zap
+  History,
+  WandSparkles,
+  Workflow
 ];
 
 const reasonIcons: LucideIcon[] = [Zap, BrainCircuit, Sparkles, ShieldCheck, Workflow];
@@ -568,6 +567,97 @@ export function LandingPage() {
           </div>
         </section>
 
+        <section id="preview" className="px-4 py-20 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-6xl">
+            <Reveal>
+              <div className="product-preview-stage glass-panel p-5 sm:p-7 lg:p-8">
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,_rgba(56,189,248,0.14),_transparent_28%),radial-gradient(circle_at_84%_10%,_rgba(168,85,247,0.16),_transparent_24%)]" />
+                <div className="relative grid gap-8 lg:grid-cols-[minmax(0,0.86fr)_minmax(0,1.14fr)] lg:items-center">
+                  <div className="space-y-7">
+                    <Intro
+                      eyebrow={copy.productPreview.eyebrow}
+                      title={copy.productPreview.title}
+                      text={copy.productPreview.description}
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      {copy.productPreview.workflow.map((item, index) => (
+                        <span
+                          key={item}
+                          className="workflow-pill"
+                          style={{ ["--pill-delay" as string]: `${index * 110}ms` } as CSSProperties}
+                        >
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="product-preview-shell">
+                    <div className="product-orbit one" aria-hidden />
+                    <div className="product-orbit two" aria-hidden />
+                    <div className="product-window">
+                      <div className="flex items-center justify-between gap-4 border-b border-white/10 px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className="h-3 w-3 rounded-full bg-rose-400/80" />
+                          <span className="h-3 w-3 rounded-full bg-amber-300/80" />
+                          <span className="h-3 w-3 rounded-full bg-emerald-300/80" />
+                        </div>
+                        <div className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-sky-100">
+                          NovaMind OS Layer
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 p-4 sm:grid-cols-[0.9fr_1.1fr]">
+                        <div className="space-y-3">
+                          {copy.productPreview.panels.map((panel, index) => (
+                            <div key={panel.title} className="preview-mini-card" style={{ ["--card-delay" as string]: `${index * 120}ms` } as CSSProperties}>
+                              <div className="text-[10px] uppercase tracking-[0.22em] text-sky-200/80">{panel.label}</div>
+                              <div className="mt-2 text-base font-semibold text-white">{panel.title}</div>
+                              <p className="mt-2 text-xs leading-6 text-slate-300">{panel.text}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="rounded-[28px] border border-white/10 bg-black/25 p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-sky-300/20 bg-sky-300/10 text-sky-100">
+                                <MonitorSmartphone className="h-5 w-5" />
+                              </div>
+                              <div>
+                                <div className="text-sm font-semibold text-white">Workspace Pulse</div>
+                                <div className="text-xs text-slate-400">Context, files, voice, tools</div>
+                              </div>
+                            </div>
+                            <div className="thinking-dots" aria-hidden><span /><span /><span /></div>
+                          </div>
+
+                          <div className="mt-5 space-y-3">
+                            {[
+                              ["Screen", "Analyzing visible workflow"],
+                              ["Files", "3 generated items connected"],
+                              ["Voice", "Ready for interruptible help"],
+                              ["Code", "Debug path prepared"]
+                            ].map(([label, value], index) => (
+                              <div key={label} className="preview-signal-row" style={{ ["--row-delay" as string]: `${index * 90}ms` } as CSSProperties}>
+                                <div>
+                                  <div className="text-xs uppercase tracking-[0.2em] text-slate-500">{label}</div>
+                                  <div className="mt-1 text-sm text-slate-100">{value}</div>
+                                </div>
+                                <Command className="h-4 w-4 text-sky-200" />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Reveal>
+          </div>
+        </section>
+
         <section className="px-4 py-20 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-6xl space-y-10">
             <Reveal>
@@ -789,6 +879,34 @@ export function LandingPage() {
           </div>
         </section>
       </main>
+
+      <section className="relative z-10 px-4 py-20 sm:px-6 lg:px-8">
+        <Reveal>
+          <div className="final-cta-panel mx-auto max-w-6xl overflow-hidden rounded-[36px] border border-white/10 p-6 text-center shadow-[0_32px_140px_rgba(2,6,23,0.58)] sm:p-10 lg:p-14">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,_rgba(56,189,248,0.20),_transparent_30%),radial-gradient(circle_at_82%_10%,_rgba(168,85,247,0.22),_transparent_28%),linear-gradient(135deg,_rgba(15,23,42,0.86),_rgba(8,10,24,0.94))]" />
+            <div className="relative mx-auto max-w-3xl">
+              <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-[24px] border border-sky-300/20 bg-sky-300/10 text-sky-100 shadow-[0_0_60px_rgba(56,189,248,0.22)]">
+                <Rocket className="h-7 w-7" />
+              </div>
+              <h2 className="text-balance font-heading text-3xl font-semibold leading-tight text-white sm:text-5xl">
+                {copy.finalCta.title}
+              </h2>
+              <p className="mx-auto mt-5 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base sm:leading-8">
+                {copy.finalCta.description}
+              </p>
+              <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+                <a href="#investors" className={cn(buttonVariants({ size: "lg" }), "w-full sm:w-auto")}>
+                  {copy.finalCta.primary}
+                  <ArrowRight className="h-4 w-4" />
+                </a>
+                <a href="#contact" className={cn(buttonVariants({ variant: "secondary", size: "lg" }), "w-full sm:w-auto")}>
+                  {copy.finalCta.secondary}
+                </a>
+              </div>
+            </div>
+          </div>
+        </Reveal>
+      </section>
 
       <footer className="relative z-10 border-t border-white/10 px-4 py-8 sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">

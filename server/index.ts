@@ -3,6 +3,10 @@ import dotenv from "dotenv";
 import express from "express";
 import multer from "multer";
 import { toFile } from "openai";
+import type {
+  ChatCompletionCreateParamsStreaming,
+  ChatCompletionMessageParam
+} from "openai/resources/chat/completions/completions";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -56,10 +60,10 @@ async function createStreamChatCompletion(options: {
   openai: ReturnType<typeof getOpenAIClient>;
   model: string;
   temperature: number;
-  messages: Array<Record<string, unknown>>;
+  messages: ChatCompletionMessageParam[];
   webSearch: boolean;
 }) {
-  const baseRequest = {
+  const baseRequest: ChatCompletionCreateParamsStreaming = {
     model: options.model,
     stream: true as const,
     temperature: options.temperature,
@@ -115,7 +119,7 @@ app.post("/api/chat/stream", async (req, res) => {
   try {
     const openai = getOpenAIClient();
     const lastMessageIndex = messages.length - 1;
-    const modelMessages = messages.map((message, index) => {
+    const modelMessages: ChatCompletionMessageParam[] = messages.map((message, index) => {
       if (imageDataUrl && index === lastMessageIndex && message.role === "user") {
         const promptText =
           typeof message.content === "string" ? message.content : JSON.stringify(message.content);
@@ -403,6 +407,47 @@ app.post("/api/speech/tts", async (req, res) => {
   } catch (error) {
     res.status(500).json({
       error: error instanceof Error ? error.message : "Text-to-speech failed."
+    });
+  }
+});
+
+app.post("/api/images/generate", async (req, res) => {
+  const {
+    prompt,
+    model = "gpt-image-1",
+    size = "1024x1024"
+  }: {
+    prompt?: string;
+    model?: string;
+    size?: "1024x1024" | "1536x1024" | "1024x1536";
+  } = req.body;
+
+  if (!prompt?.trim()) {
+    res.status(400).json({ error: "prompt is required." });
+    return;
+  }
+
+  try {
+    const openai = getOpenAIClient();
+    const result = await openai.images.generate({
+      model,
+      prompt,
+      size
+    });
+
+    const imageBase64 = result.data?.[0]?.b64_json;
+
+    if (!imageBase64) {
+      res.status(500).json({ error: "NovaMind returned an empty image response." });
+      return;
+    }
+
+    res.json({
+      imageDataUrl: `data:image/png;base64,${imageBase64}`
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: error instanceof Error ? error.message : "Image generation failed."
     });
   }
 });

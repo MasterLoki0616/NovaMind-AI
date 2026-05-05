@@ -64,7 +64,7 @@ export function SettingsPage({ settings, onChange }: SettingsPageProps) {
           </div>
           <h2 className="font-heading text-3xl font-semibold">Tune NovaMind for your workflow.</h2>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-muted-foreground">
-            Configure the backend URL, default chat model, temperature, voice behavior, and extra system guidance. Settings persist in local storage for the desktop app.
+            Configure the protected NovaMind AI layer, default chat model, voice behavior, and extra system guidance. Settings persist locally for the desktop app.
           </p>
         </div>
 
@@ -87,7 +87,7 @@ export function SettingsPage({ settings, onChange }: SettingsPageProps) {
               <>
                 <div className="flex items-center gap-2 text-emerald-300">
                   <CheckCircle2 className="h-4 w-4" />
-                  API reachable at {settings.apiBaseUrl}
+                  Protected NovaMind backend is reachable.
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-muted-foreground">
                   OpenAI key configured: {health.hasOpenAIKey ? "yes" : "no"}
@@ -107,15 +107,11 @@ export function SettingsPage({ settings, onChange }: SettingsPageProps) {
           <Card>
             <CardHeader>
               <CardTitle>API & Model</CardTitle>
-              <CardDescription>Control how the frontend talks to the local backend.</CardDescription>
+              <CardDescription>NovaMind now uses a protected AI route instead of user-managed API secrets.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="mb-2 block text-sm text-muted-foreground">API base URL</label>
-                <Input
-                  value={settings.apiBaseUrl}
-                  onChange={(event) => onChange({ ...settings, apiBaseUrl: event.target.value })}
-                />
+              <div className="rounded-2xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm leading-7 text-foreground md:col-span-2">
+                API key and API URL fields are now hidden from the product UI. Requests are routed through NovaMind's protected AI layer.
               </div>
               <div>
                 <label className="mb-2 block text-sm text-muted-foreground">Default model</label>

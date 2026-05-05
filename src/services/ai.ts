@@ -3,6 +3,7 @@ import { usesDesktopAiBridge } from "../lib/runtime";
 import {
   desktopAnalyzeScreen,
   desktopChatCompletionStream,
+  desktopGenerateImage,
   desktopSummarizeDocument
 } from "./desktop";
 import { fetchFormData, fetchJson, getApiUrl, safeReadError } from "./api";
@@ -14,7 +15,6 @@ interface StreamChatParams {
   model: ModelName;
   temperature: number;
   systemPrompt: string;
-  apiKey?: string;
   command?: SmartCommand | null;
   webSearch?: boolean;
   imageDataUrl?: string;
@@ -30,7 +30,6 @@ export async function streamChatResponse({
   model,
   temperature,
   systemPrompt,
-  apiKey = "",
   command,
   webSearch = false,
   imageDataUrl,
@@ -49,7 +48,6 @@ export async function streamChatResponse({
   if (usesDesktopAiBridge(baseUrl)) {
     await desktopChatCompletionStream(
       {
-        apiKey,
         mode,
         messages,
         model,
@@ -137,12 +135,10 @@ export async function analyzeScreenImage(
   baseUrl: string,
   imageDataUrl: string,
   prompt: string,
-  model: ModelName,
-  apiKey = ""
+  model: ModelName
 ) {
   if (usesDesktopAiBridge(baseUrl)) {
     const analysis = await desktopAnalyzeScreen({
-      apiKey,
       imageDataUrl,
       prompt,
       model
@@ -160,11 +156,10 @@ export async function analyzeScreenImage(
 export async function uploadDocument(
   baseUrl: string,
   file: File,
-  model: ModelName,
-  apiKey = ""
+  model: ModelName
 ) {
   if (usesDesktopAiBridge(baseUrl)) {
-    return desktopSummarizeDocument(apiKey, file, model);
+    return desktopSummarizeDocument(file, model);
   }
 
   const formData = new FormData();
@@ -181,6 +176,31 @@ export async function uploadDocument(
     ...result,
     createdAt: new Date().toISOString()
   } satisfies DocumentRecord;
+}
+
+export async function generateImageFromPrompt(
+  baseUrl: string,
+  prompt: string,
+  options?: {
+    model?: string;
+    size?: "1024x1024" | "1536x1024" | "1024x1536";
+    signal?: AbortSignal;
+  }
+) {
+  if (usesDesktopAiBridge(baseUrl)) {
+    const imageDataUrl = await desktopGenerateImage(prompt, options);
+    return { imageDataUrl };
+  }
+
+  return fetchJson<{ imageDataUrl: string }>(baseUrl, "/api/images/generate", {
+    method: "POST",
+    signal: options?.signal,
+    body: JSON.stringify({
+      prompt,
+      model: options?.model,
+      size: options?.size
+    })
+  });
 }
 
 export async function askDocumentQuestion(

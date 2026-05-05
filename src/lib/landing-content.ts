@@ -59,6 +59,13 @@ type LandingCopy = {
     description: string;
     items: Array<{ title: string; text: string }>;
   };
+  productPreview: {
+    eyebrow: string;
+    title: string;
+    description: string;
+    panels: Array<{ label: string; title: string; text: string }>;
+    workflow: string[];
+  };
   upcoming: {
     eyebrow: string;
     title: string;
@@ -107,6 +114,12 @@ type LandingCopy = {
     title: string;
     description: string;
     signals: string[];
+  };
+  finalCta: {
+    title: string;
+    description: string;
+    primary: string;
+    secondary: string;
   };
   footer: {
     copyright: string;
@@ -209,21 +222,43 @@ export const landingContent: Record<LandingLanguage, LandingCopy> = {
     },
     features: {
       eyebrow: "Core Features",
-      title: "Powerful capabilities that still feel simple and futuristic.",
+      title: "A next-generation assistant for the whole computer, not just a chat box.",
       description:
-        "Each feature is aimed at a clean, high-conversion message: NovaMind helps you understand more, move faster, and automate the repetitive parts.",
+        "NovaMind AI brings conversation, screen context, documents, voice, coding, history, smart tools, and workflow automation into one premium workspace.",
       items: [
-        { title: "Smart AI Chat", text: "Human-like conversation that stays useful." },
-        { title: "Screen Understanding", text: "AI sees the live context on your screen." },
-        { title: "Voice Interaction", text: "Natural voice control with faster flows." },
-        { title: "Memory System", text: "A second-brain layer that remembers what matters." },
-        { title: "Personal Assistant", text: "A focused AI partner for daily execution." },
-        { title: "Project Fixing", text: "Spot issues fast and move toward a fix." },
-        { title: "Terminal Automation", text: "Command-safe workflows for technical users." },
-        { title: "Open & Close Apps", text: "Reduce friction across repeated routines." },
-        { title: "Code Support", text: "Generate, explain, and debug faster." },
-        { title: "Task Automation", text: "Delegate repetitive work and keep momentum." }
+        { title: "AI Chat", text: "Fast, human-like conversations with memory-aware context." },
+        { title: "Screen AI", text: "Ask about what is visible and get useful, screen-aware answers." },
+        { title: "Voice Assistant", text: "Talk naturally while NovaMind listens, responds, and keeps flow." },
+        { title: "Document Intelligence", text: "Understand files, summarize content, and generate structured outputs." },
+        { title: "Code Assistant", text: "Explain, debug, refactor, and generate code with cleaner context." },
+        { title: "Local History", text: "Keep useful context from previous sessions without losing momentum." },
+        { title: "Smart Tools", text: "Create images, handle files, search, and trigger focused workflows." },
+        { title: "Desktop Workflow Automation", text: "Move toward a personal assistant that can help operate your computer." }
       ]
+    },
+    productPreview: {
+      eyebrow: "Product Preview",
+      title: "A futuristic desktop assistant designed to feel calm, powerful, and always close.",
+      description:
+        "The NovaMind interface is built around a simple idea: keep the assistant, your files, your context, and your next action in the same elegant workspace.",
+      panels: [
+        {
+          label: "Live context",
+          title: "Screen-aware support",
+          text: "Ask what is happening on your screen and receive guidance that understands the visible workflow."
+        },
+        {
+          label: "Workspace memory",
+          title: "History that keeps up",
+          text: "Chats, files, and generated outputs stay connected so NovaMind can continue from the last step."
+        },
+        {
+          label: "Action layer",
+          title: "Tools built into flow",
+          text: "Voice, files, images, search, and document actions are designed to feel like one product."
+        }
+      ],
+      workflow: ["Ask", "See", "Reason", "Create", "Continue"]
     },
     upcoming: {
       eyebrow: "Coming Soon",
@@ -326,6 +361,13 @@ export const landingContent: Record<LandingLanguage, LandingCopy> = {
         "NovaMind AI sits between assistant software, memory systems, automation, and premium product design. It is an early-stage bet on how personal computing will evolve.",
       signals: ["High upside", "Global demand", "Strong direction"]
     },
+    finalCta: {
+      title: "Build the future of personal AI with NovaMind.",
+      description:
+        "NovaMind AI is moving toward a premium assistant that understands your computer, your workflow, and your intent. Join the story early.",
+      primary: "Become an Investor",
+      secondary: "Contact the Founder"
+    },
     footer: {
       copyright: "© 2026 NovaMind AI. Built for a future where intelligence feels native.",
       instagram: "Instagram"
@@ -425,21 +467,43 @@ export const landingContent: Record<LandingLanguage, LandingCopy> = {
     },
     features: {
       eyebrow: "Temel Özellikler",
-      title: "Güçlü ama hâlâ sade ve futuristik hissettiren yetenekler.",
+      title: "Sadece sohbet kutusu değil, tüm bilgisayar için yeni nesil bir asistan.",
       description:
-        "Her özellik tek bir mesaj taşıyor: NovaMind daha iyi anlamanı, daha hızlı ilerlemeni ve tekrarlayan işi otomatikleştirmeni sağlar.",
+        "NovaMind AI; sohbeti, ekran bağlamını, dokümanları, sesi, kodu, geçmişi, akıllı araçları ve iş akışı otomasyonunu tek premium çalışma alanında birleştirir.",
       items: [
-        { title: "Akıllı AI Sohbet", text: "İnsan gibi ama gerçekten faydalı kalan konuşmalar." },
-        { title: "Ekran Anlayışı", text: "AI, ekrandaki canlı bağlamı görür ve yorumlar." },
-        { title: "Sesli Etkileşim", text: "Daha hızlı akışlar için doğal ses kontrolü." },
-        { title: "Hafıza Sistemi", text: "Önemli olanı hatırlayan ikinci beyin katmanı." },
-        { title: "Kişisel Asistan", text: "Günlük yürütme için odaklı bir AI partneri." },
-        { title: "Proje Düzeltme", text: "Sorunları hızlı fark et ve çözüme yaklaş." },
-        { title: "Terminal Otomasyonu", text: "Teknik kullanıcılar için güvenli komut akışları." },
-        { title: "Uygulama Aç/Kapat", text: "Tekrarlayan rutinlerde sürtünmeyi azalt." },
-        { title: "Kod Desteği", text: "Daha hızlı üret, açıkla ve debug et." },
-        { title: "Görev Otomasyonu", text: "Tekrarlayan işi devret ve hızını koru." }
+        { title: "AI Sohbet", text: "Hafıza destekli bağlamla hızlı ve insan gibi konuşmalar." },
+        { title: "Screen AI", text: "Ekranda görünen şeyi sor ve görsel bağlamı anlayan cevaplar al." },
+        { title: "Voice Assistant", text: "Doğal konuş, NovaMind dinlesin, cevap versin ve akışı korusun." },
+        { title: "Document Intelligence", text: "Dosyaları anla, özetle ve yapılandırılmış çıktılar üret." },
+        { title: "Code Assistant", text: "Daha temiz bağlamla kodu açıkla, debug et, refactor et ve üret." },
+        { title: "Local History", text: "Geçmiş oturumlardan faydalı bağlamı koru ve momentum kaybetme." },
+        { title: "Smart Tools", text: "Görsel üret, dosya işle, arama yap ve odaklı iş akışları başlat." },
+        { title: "Desktop Workflow Automation", text: "Bilgisayarınla çalışabilen kişisel asistana doğru ilerle." }
       ]
+    },
+    productPreview: {
+      eyebrow: "Ürün Önizleme",
+      title: "Sakin, güçlü ve her zaman yakında hissettiren futuristik masaüstü asistanı.",
+      description:
+        "NovaMind arayüzü tek bir fikir etrafında tasarlanıyor: asistanı, dosyaları, bağlamı ve bir sonraki aksiyonu aynı zarif çalışma alanında tutmak.",
+      panels: [
+        {
+          label: "Canlı bağlam",
+          title: "Ekran farkındalığı",
+          text: "Ekranında olanı sor ve görünen iş akışını anlayan yönlendirme al."
+        },
+        {
+          label: "Çalışma alanı hafızası",
+          title: "Takip eden geçmiş",
+          text: "Sohbetler, dosyalar ve üretilen çıktılar bağlı kalır; NovaMind son adımdan devam eder."
+        },
+        {
+          label: "Aksiyon katmanı",
+          title: "Akışa gömülü araçlar",
+          text: "Ses, dosya, görsel, arama ve doküman aksiyonları tek ürün gibi hissettirilir."
+        }
+      ],
+      workflow: ["Sor", "Gör", "Düşün", "Üret", "Devam et"]
     },
     upcoming: {
       eyebrow: "Yakında",
@@ -541,6 +605,13 @@ export const landingContent: Record<LandingLanguage, LandingCopy> = {
       description:
         "NovaMind AI; asistan yazılımı, hafıza sistemleri, otomasyon ve premium ürün tasarımının kesişiminde yer alıyor. Bu, kişisel bilişimin nasıl evrileceğine dair erken aşama bir fırsat.",
       signals: ["Yüksek potansiyel", "Küresel talep", "Güçlü yön"]
+    },
+    finalCta: {
+      title: "Kişisel AI geleceğini NovaMind ile inşa et.",
+      description:
+        "NovaMind AI; bilgisayarını, iş akışını ve niyetini anlayan premium bir asistana doğru ilerliyor. Hikayeye erken katıl.",
+      primary: "Yatırımcı Ol",
+      secondary: "Kurucu ile İletişime Geç"
     },
     footer: {
       copyright: "© 2026 NovaMind AI. Zekânın doğal hissettiği bir gelecek için üretildi.",

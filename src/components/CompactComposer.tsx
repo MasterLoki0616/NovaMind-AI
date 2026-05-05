@@ -1,35 +1,68 @@
-import { AudioLines, FileText, FileUp, MonitorSmartphone, SendHorizonal, X } from "lucide-react";
+import {
+  AudioLines,
+  ChevronDown,
+  FileText,
+  FileUp,
+  Globe2,
+  ImagePlus,
+  MonitorSmartphone,
+  Plus,
+  SendHorizonal,
+  Square,
+  Sparkles,
+  X
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { getAppText } from "../lib/i18n";
+import { chatModelGroups, getChatModelOption } from "../lib/models";
+import { cn } from "../lib/utils";
 import type { AppLanguage, AttachmentRecord } from "../types/app";
-import { VoiceButton } from "./VoiceButton";
+import { VoiceButton, type VoiceButtonHandle, type VoiceButtonState } from "./VoiceButton";
 import { Button } from "./ui/button";
-import { GlowLoader } from "./ui/glow-loader";
+
+export type ComposerQuickAction = "image" | "web-search";
+
+type ToolMenuItem = {
+  id: string;
+  icon: typeof MonitorSmartphone;
+  label: string;
+  disabled?: boolean;
+  onSelect: () => void;
+};
 
 interface CompactComposerProps {
   apiBaseUrl: string;
-  openAiApiKey?: string;
   language?: AppLanguage;
   pendingAttachments?: AttachmentRecord[];
   disabled?: boolean;
   isSending: boolean;
   isUploadingFile?: boolean;
-  onSend: (value: string) => Promise<boolean>;
+  selectedModelId: string;
+  onSelectModel: (modelId: string) => void;
+  onSend: (value: string, options?: { quickAction?: ComposerQuickAction | null }) => Promise<boolean>;
+  onStopGenerating?: () => void;
   onOpenScreenAssistant: () => void;
   onOpenVoiceChat: () => void;
   onFilesSelected: (files: FileList | File[]) => void | Promise<void>;
   onRemoveAttachment?: (attachmentId: string) => void;
 }
 
+function quickActionLabel(language: AppLanguage, action: ComposerQuickAction) {
+  const text = getAppText(language);
+  return action === "image" ? text.createImage : text.webSearch;
+}
+
 export function CompactComposer({
   apiBaseUrl,
-  openAiApiKey = "",
   language = "en",
   pendingAttachments = [],
   disabled = false,
   isSending,
   isUploadingFile = false,
+  selectedModelId,
+  onSelectModel,
   onSend,
+  onStopGenerating,
   onOpenScreenAssistant,
   onOpenVoiceChat,
   onFilesSelected,
@@ -37,14 +70,23 @@ export function CompactComposer({
 }: CompactComposerProps) {
   const text = getAppText(language);
   const [value, setValue] = useState("");
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMoreToolsOpen, setIsMoreToolsOpen] = useState(false);
+  const [quickAction, setQuickAction] = useState<ComposerQuickAction | null>(null);
+  const [speechError, setSpeechError] = useState<string | null>(null);
+  const [speechState, setSpeechState] = useState<VoiceButtonState>("idle");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const actionMenuRef = useRef<HTMLDivElement | null>(null);
+  const voiceButtonRef = useRef<VoiceButtonHandle | null>(null);
+  const speechBaseValueRef = useRef("");
+  const selectedModel = getChatModelOption(selectedModelId);
 
   useEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
     textarea.style.height = "0px";
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
   }, [value]);
 
   useEffect(() => {
@@ -55,22 +97,111 @@ export function CompactComposer({
       }
     }
 
+    function handlePointerDown(event: PointerEvent) {
+      if (!actionMenuRef.current?.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    }
+
     window.addEventListener("keydown", handleShortcut);
-    return () => window.removeEventListener("keydown", handleShortcut);
+    window.addEventListener("pointerdown", handlePointerDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleShortcut);
+      window.removeEventListener("pointerdown", handlePointerDown);
+    };
   }, []);
 
   async function handleSubmit() {
     const normalized = value.trim();
     if (!normalized || disabled || isSending) return;
 
-    const sent = await onSend(normalized);
+    const sent = await onSend(normalized, { quickAction });
     if (sent) {
       setValue("");
+      setQuickAction(null);
     }
   }
 
+  async function handleSpeechToText() {
+    setIsMenuOpen(false);
+    speechBaseValueRef.current = value.trim();
+    setSpeechError(null);
+    await voiceButtonRef.current?.startRecording();
+  }
+
+  function mergeTranscript(base: string, transcript: string) {
+    const normalizedTranscript = transcript.trim();
+    if (!normalizedTranscript) {
+      return base;
+    }
+
+    return [base, normalizedTranscript].filter(Boolean).join(base ? " " : "");
+  }
+
+  const toolMenuItems: ToolMenuItem[] = [
+    {
+      id: "screen",
+      icon: MonitorSmartphone,
+      label: text.liveScreenShare,
+      onSelect: () => {
+        setIsMenuOpen(false);
+        onOpenScreenAssistant();
+      }
+    },
+    {
+      id: "file",
+      icon: FileUp,
+      label: text.uploadAFile,
+      disabled: isUploadingFile,
+      onSelect: () => {
+        setIsMenuOpen(false);
+        fileInputRef.current?.click();
+      }
+    },
+    {
+      id: "voice",
+      icon: AudioLines,
+      label: text.voiceChatStart,
+      disabled: false,
+      onSelect: () => {
+        setIsMenuOpen(false);
+        onOpenVoiceChat();
+      }
+    },
+    {
+      id: "speech",
+      icon: Sparkles,
+      label: text.voiceToText,
+      disabled: false,
+      onSelect: () => {
+        void handleSpeechToText();
+      }
+    },
+    {
+      id: "image",
+      icon: ImagePlus,
+      label: text.createImage,
+      disabled: false,
+      onSelect: () => {
+        setQuickAction("image");
+        setIsMenuOpen(false);
+      }
+    },
+    {
+      id: "web-search",
+      icon: Globe2,
+      label: text.webSearch,
+      disabled: false,
+      onSelect: () => {
+        setQuickAction("web-search");
+        setIsMenuOpen(false);
+      }
+    }
+  ] as const;
+
   return (
-    <div className="motion-fade-up rounded-[24px] border border-border bg-card/75 p-3 shadow-[0_24px_90px_rgba(2,6,23,0.38)] sm:rounded-[30px] sm:p-4">
+    <div className="composer-shell motion-fade-up relative overflow-visible rounded-[24px] border border-border bg-card/75 p-3 shadow-[0_24px_90px_rgba(2,6,23,0.38)] sm:rounded-[30px] sm:p-4">
       {pendingAttachments.length > 0 ? (
         <div className="mb-3 grid gap-2">
           {pendingAttachments.map((attachment) => (
@@ -103,14 +234,139 @@ export function CompactComposer({
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-3">
-        <div className="min-w-0">
+      {quickAction ? (
+        <div className="mb-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setQuickAction(null)}
+            className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/12 px-3 py-1.5 text-xs font-medium text-primary transition hover:border-primary/40 hover:bg-primary/18"
+          >
+            <span>{quickActionLabel(language, quickAction)}</span>
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ) : null}
+
+      <div className="composer-row flex min-w-0 items-center gap-2">
+        <div ref={actionMenuRef} className="relative shrink-0">
+          <Button
+            type="button"
+            size="icon"
+            variant="secondary"
+            disabled={disabled || isSending}
+            onClick={() => setIsMenuOpen((current) => !current)}
+            aria-label={text.tools}
+            className="h-11 w-11 rounded-[16px]"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+
+          <div
+            className={cn(
+              "absolute bottom-[calc(100%+0.85rem)] left-0 z-30 w-[min(320px,calc(100vw-3rem))] origin-bottom-left rounded-[28px] border border-border/80 bg-card/95 p-3 shadow-[0_24px_80px_rgba(2,6,23,0.48)] backdrop-blur-2xl transition duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]",
+              isMenuOpen
+                ? "pointer-events-auto translate-y-0 scale-100 opacity-100"
+                : "pointer-events-none translate-y-2 scale-[0.96] opacity-0"
+            )}
+          >
+            <div className="mb-2 px-2 text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
+              {text.tools}
+            </div>
+            <div className="grid gap-2">
+              {toolMenuItems.map((item) => {
+                const Icon = item.icon;
+                const active =
+                  (item.id === "image" && quickAction === "image") ||
+                  (item.id === "web-search" && quickAction === "web-search");
+
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={item.onSelect}
+                    className={cn(
+                      "flex items-center justify-between rounded-2xl border px-3 py-3 text-left transition",
+                      active
+                        ? "border-primary/25 bg-primary/12"
+                        : "border-border/80 bg-background/55 hover:border-border hover:bg-card",
+                      item.disabled && "cursor-not-allowed opacity-60 hover:border-border/80 hover:bg-background/55"
+                    )}
+                    disabled={item.disabled}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-border/80 bg-background/70 text-primary">
+                        <Icon className="h-4 w-4" />
+                      </div>
+                      <div className="text-sm font-medium text-foreground">{item.label}</div>
+                    </div>
+                    {active ? <div className="h-2 w-2 rounded-full bg-primary" /> : null}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-3 border-t border-border/70 pt-3">
+              <button
+                type="button"
+                onClick={() => setIsMoreToolsOpen((current) => !current)}
+                className="flex w-full items-center justify-between rounded-2xl px-3 py-2 text-left text-sm text-muted-foreground transition hover:bg-background/50 hover:text-foreground"
+              >
+                <span>{text.additionalTools}</span>
+                <ChevronDown
+                  className={cn("h-4 w-4 transition duration-200", isMoreToolsOpen && "rotate-180")}
+                />
+              </button>
+              <div
+                className={cn(
+                  "grid transition-[grid-template-rows,opacity] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                  isMoreToolsOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                )}
+              >
+                <div className="overflow-hidden">
+                  <div className="mt-2 grid gap-2 px-1">
+                    <div className="rounded-2xl border border-dashed border-border bg-background/45 px-3 py-3 text-sm text-muted-foreground">
+                      {text.moreToolsSoon}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="hidden">
+            <VoiceButton
+              ref={voiceButtonRef}
+              apiBaseUrl={apiBaseUrl}
+              language={language}
+              disabled={disabled || isSending}
+              onTranscriptPreview={(transcript) => {
+                setValue(mergeTranscript(speechBaseValueRef.current, transcript));
+              }}
+              onTranscript={(transcript) => {
+                const merged = mergeTranscript(speechBaseValueRef.current, transcript);
+                speechBaseValueRef.current = merged;
+                setValue(merged);
+                textareaRef.current?.focus();
+              }}
+              onStateChange={setSpeechState}
+              onErrorMessage={setSpeechError}
+              compactLabel={text.voiceToText}
+              showInlineError={false}
+              title={text.voiceToText}
+            />
+          </div>
+        </div>
+
+        <div className="min-w-0 flex-1">
           <textarea
             ref={textareaRef}
             value={value}
             rows={1}
             disabled={disabled}
-            onChange={(event) => setValue(event.target.value)}
+            onChange={(event) => {
+              speechBaseValueRef.current = event.target.value.trim();
+              setValue(event.target.value);
+            }}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
@@ -118,89 +374,57 @@ export function CompactComposer({
               }
             }}
             placeholder={text.startByTyping}
-            className="field-shell max-h-[180px] min-h-[52px] w-full resize-none rounded-[22px] px-3 py-3 text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground focus:ring-0 sm:min-h-[56px] sm:text-sm sm:leading-7"
+            className={cn(
+              "composer-textarea field-shell max-h-[120px] min-h-11 w-full resize-none rounded-[16px] px-4 py-2.5 text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground focus:ring-0",
+              speechState !== "idle" && "ring-1 ring-primary/40"
+            )}
           />
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="grid w-full grid-cols-4 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              disabled={disabled || isSending}
-              onClick={onOpenScreenAssistant}
-              aria-label={text.liveScreenShare}
-              title={text.liveScreenShare}
-              className="h-10 w-full px-0 sm:h-10 sm:w-auto sm:px-3"
-            >
-              <MonitorSmartphone className="h-4 w-4" />
-              <span className="hidden md:inline">{text.liveScreenShare}</span>
-            </Button>
-
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              disabled={disabled || isSending || isUploadingFile}
-              onClick={() => fileInputRef.current?.click()}
-              aria-label={text.uploadAFile}
-              title={text.uploadAFile}
-              className="h-10 w-full px-0 sm:h-10 sm:w-auto sm:px-3"
-            >
-              {isUploadingFile ? (
-                <GlowLoader size="sm" />
-              ) : (
-                <FileUp className="h-4 w-4" />
-              )}
-              <span className="hidden md:inline">{text.uploadAFile}</span>
-            </Button>
-
-            <VoiceButton
-              apiBaseUrl={apiBaseUrl}
-              openAiApiKey={openAiApiKey}
-              language={language}
-              disabled={disabled || isSending}
-              onTranscript={(transcript) => {
-                setValue((current) => (current ? `${current} ${transcript}` : transcript));
-                textareaRef.current?.focus();
-              }}
-              compactLabel={text.voiceToText}
-              showInlineError={false}
-              title={text.voiceToText}
-            />
-
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              disabled={disabled || isSending}
-              onClick={onOpenVoiceChat}
-              aria-label={text.voiceChatStart}
-              title={text.voiceChatStart}
-              className="h-10 w-full px-0 sm:h-10 sm:w-auto sm:px-3"
-            >
-              <AudioLines className="h-4 w-4" />
-              <span className="hidden md:inline">{text.voiceChatStart}</span>
-            </Button>
-          </div>
-
-          <Button
-            type="button"
-            className="h-10 w-full sm:w-auto sm:self-auto"
-            onClick={() => void handleSubmit()}
-            disabled={disabled || isSending || !value.trim()}
-            aria-label={text.send}
+        <label
+          className="model-select-shell h-11 w-[168px] shrink-0 rounded-[16px]"
+          title={selectedModel?.description ?? selectedModelId}
+        >
+          <span className="model-select-label">{text.selectModel}</span>
+          <select
+            value={selectedModelId}
+            onChange={(event) => onSelectModel(event.target.value)}
+            className="model-select-control"
+            aria-label={text.selectModel}
           >
-            {isSending ? (
-              <GlowLoader size="sm" />
-            ) : (
-              <SendHorizonal className="h-4 w-4" />
-            )}
-            {text.send}
-          </Button>
-        </div>
+            {chatModelGroups.map((group) => (
+              <optgroup key={group.id} label={group.label}>
+                {group.options.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary/80" />
+        </label>
+
+        <Button
+          type="button"
+          className={cn(
+            "h-11 shrink-0 rounded-[16px] px-4 sm:px-5",
+            isSending && "border-red-400/25 bg-red-500/15 text-red-100 hover:bg-red-500/20"
+          )}
+          onClick={() => (isSending ? onStopGenerating?.() : void handleSubmit())}
+          disabled={disabled || (!isSending && !value.trim())}
+          aria-label={isSending ? text.stopGenerating : text.send}
+        >
+          {isSending ? <Square className="h-3.5 w-3.5 fill-current" /> : <SendHorizonal className="h-4 w-4" />}
+          <span className="hidden sm:inline">{isSending ? text.stopGenerating : text.send}</span>
+        </Button>
       </div>
+
+      {speechError ? (
+        <div className="mt-3 rounded-2xl border border-red-400/20 bg-red-400/10 px-3 py-2 text-xs text-red-200">
+          {speechError}
+        </div>
+      ) : null}
 
       <input
         ref={fileInputRef}

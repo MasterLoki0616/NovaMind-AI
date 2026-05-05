@@ -1,10 +1,12 @@
 import {
   Check,
-  ChevronDown,
+  Image as ImageIcon,
+  MessageSquareText,
   Moon,
   MonitorSmartphone,
   PencilLine,
   Plus,
+  Search,
   Settings2,
   Sparkles,
   Sun,
@@ -12,12 +14,10 @@ import {
   X,
   Upload
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import logoUrl from "../../logo.png";
 import { getAppText } from "../lib/i18n";
-import { chatModelGroups, getChatModelOption } from "../lib/models";
-import { usesDesktopAiBridge } from "../lib/runtime";
+import { extractMemoryCandidates, retrieveRelevantMemory } from "../lib/memory/memoryRetriever";
 import { parseSmartCommand } from "../lib/smartCommands";
 import {
   createConversation,
@@ -28,13 +28,19 @@ import {
   saveConversations
 } from "../lib/storage";
 import {
-  bytesToReadable,
   formatRelativeTime,
   makeConversationTitle,
   truncate
 } from "../lib/utils";
 import { prepareDocumentAttachment } from "../services/attachments";
-import { analyzeScreenImage, streamChatResponse } from "../services/ai";
+import { executor, getConversationFiles, isAgentRequest, memory_store, planner } from "../services/agent";
+import {
+  analyzeScreenImage,
+  generateImageFromPrompt,
+  streamChatResponse
+} from "../services/ai";
+import { buildGeneratedImageName } from "../services/downloads";
+import { desktopSaveAgentFile } from "../services/desktop";
 import { loadAttachmentPreview, type LoadedAttachmentPreview } from "../services/filePreview";
 import {
   captureScreenImage,
@@ -46,6 +52,8 @@ import {
 import { requestSpeechBlob, transcribeAudio } from "../services/speech";
 import type {
   AppTheme,
+  AgentGeneratedFileRecord,
+  AgentRunResult,
   AttachmentRecord,
   AppSettings,
   ChatMessage,
@@ -55,7 +63,7 @@ import type {
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { ChatWindow } from "./ChatWindow";
-import { CompactComposer } from "./CompactComposer";
+import { CompactComposer, type ComposerQuickAction } from "./CompactComposer";
 import { FeedbackButton } from "./FeedbackButton";
 import { FilePreviewModal } from "./FilePreviewModal";
 import { Input } from "./ui/input";
@@ -75,6 +83,60 @@ function sortConversations(conversations: Conversation[]) {
   );
 }
 
+function mergeConversationFiles(...groups: Array<AgentGeneratedFileRecord[] | undefined>) {
+  const byId = new Map<string, AgentGeneratedFileRecord>();
+  groups.flatMap((group) => group ?? []).forEach((file) => byId.set(file.id, file));
+  return [...byId.values()].sort(
+    (left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
+  );
+}
+
+function generatedFilesFromRun(run: AgentRunResult) {
+  return run.executedActions
+    .map((execution) => execution.generatedFile)
+    .filter((file): file is AgentGeneratedFileRecord => Boolean(file));
+}
+
+function syncAgentRunFiles(run: AgentRunResult | undefined, files: AgentGeneratedFileRecord[]) {
+  if (!run || files.length === 0) return run;
+  const byId = new Map(files.map((file) => [file.id, file]));
+
+  return {
+    ...run,
+    executedActions: run.executedActions.map((execution) => {
+      const currentFile = execution.generatedFile ? byId.get(execution.generatedFile.id) : null;
+      return currentFile ? { ...execution, generatedFile: currentFile } : execution;
+    })
+  };
+}
+
+function syncMessageFileCards(message: ChatMessage, files: AgentGeneratedFileRecord[]) {
+  const agentRun = syncAgentRunFiles(message.meta?.agentRun, files);
+  if (!agentRun || agentRun === message.meta?.agentRun) return message;
+  return {
+    ...message,
+    meta: {
+      ...message.meta,
+      agentRun
+    }
+  };
+}
+
+function fileContextItems(files: AgentGeneratedFileRecord[]) {
+  return files.slice(0, 12).map((file) => ({
+    id: file.id,
+    type: "document" as const,
+    title: file.title,
+    content: `${file.filename} (${file.format.toUpperCase()}, v${file.version}): ${file.content.slice(0, 900)}`,
+    score: 1.1
+  }));
+}
+
+function getConversationFilesFor(conversation?: Conversation | null) {
+  if (!conversation) return [];
+  return mergeConversationFiles(conversation.files, getConversationFiles(conversation.id));
+}
+
 function loadInitialConversations() {
   const stored = loadConversations().filter((conversation) => conversation.mode === "chat");
   if (stored.length > 0) {
@@ -92,6 +154,27 @@ function createScreenAssistantState() {
     prompt: "Explain what is on this screen and tell me the fastest way to help.",
     status: "idle" as "idle" | "capturing" | "analyzing",
     error: null as string | null
+  };
+}
+
+type GeneratedImageEntry = {
+  id: string;
+  conversationId: string;
+  messageId: string;
+  url: string;
+  label: string;
+  createdAt: string;
+};
+
+function extractGeneratedImage(content: string) {
+  const match = /!\[([^\]]*)\]\((data:image\/[^)]+|https?:\/\/[^)\s]+)\)/i.exec(content);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    label: match[1]?.trim() || "NovaMind image",
+    url: match[2]
   };
 }
 
@@ -146,6 +229,7 @@ type SendMessageOptions = {
   inputMethod?: "text" | "voice";
   source?: "chat" | "document" | "screen" | "voice";
   autoSpeakReply?: boolean;
+  webSearch?: boolean;
   signal?: AbortSignal;
   forceFreshScreenFrame?: boolean;
   onDelta?: (partial: string) => void;
@@ -164,6 +248,7 @@ export function DesktopShell() {
   );
   const [pendingConversationId, setPendingConversationId] = useState<string | null>(null);
   const [pendingAttachments, setPendingAttachments] = useState<AttachmentRecord[]>([]);
+  const [chatSearchQuery, setChatSearchQuery] = useState("");
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
   const [composerError, setComposerError] = useState<string | null>(null);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
@@ -180,7 +265,6 @@ export function DesktopShell() {
   const [liveScreenVoiceReplies, setLiveScreenVoiceReplies] = useState(() =>
     (defaultSettings.voiceAutoSpeak ?? true)
   );
-  const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [audioDevices, setAudioDevices] = useState<AudioDeviceOption[]>([]);
   const [audioOutputSelectionSupported, setAudioOutputSelectionSupported] = useState(true);
@@ -199,13 +283,6 @@ export function DesktopShell() {
     null
   );
   const [draftConversationTitle, setDraftConversationTitle] = useState("");
-  const [modelMenuPosition, setModelMenuPosition] = useState({
-    top: 0,
-    left: 0,
-    width: 360
-  });
-  const modelTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const modelMenuRef = useRef<HTMLDivElement | null>(null);
   const voiceLoopEnabledRef = useRef(false);
   const voiceSessionIdRef = useRef(0);
   const voiceMediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -234,6 +311,7 @@ export function DesktopShell() {
   const liveScreenPreviewVideoRef = useRef<HTMLVideoElement | null>(null);
   const liveScreenFrameIntervalRef = useRef<number | null>(null);
   const liveScreenLatestFrameRef = useRef<string | null>(null);
+  const activeRequestAbortRef = useRef<AbortController | null>(null);
 
   function getErrorMessage(error: unknown, fallback: string) {
     if (error instanceof Error && error.message.trim()) {
@@ -285,6 +363,20 @@ export function DesktopShell() {
     }
 
     return typeof error === "string" && /aborted/i.test(error);
+  }
+
+  function stopActiveGeneration() {
+    activeRequestAbortRef.current?.abort();
+    activeRequestAbortRef.current = null;
+    setBusyLabel(null);
+    setPendingConversationId(null);
+  }
+
+  function createComposerAbortController() {
+    activeRequestAbortRef.current?.abort();
+    const controller = new AbortController();
+    activeRequestAbortRef.current = controller;
+    return controller;
   }
 
   useEffect(() => {
@@ -362,6 +454,8 @@ export function DesktopShell() {
     return () => {
       voiceLoopEnabledRef.current = false;
       voiceSessionIdRef.current += 1;
+      activeRequestAbortRef.current?.abort();
+      activeRequestAbortRef.current = null;
       voiceResponseAbortRef.current?.abort();
       const recorder = voiceMediaRecorderRef.current;
 
@@ -378,19 +472,8 @@ export function DesktopShell() {
   }, []);
 
   useEffect(() => {
-    function handlePointerDown(event: MouseEvent) {
-      const target = event.target as Node;
-      const insideTrigger = modelTriggerRef.current?.contains(target);
-      const insideMenu = modelMenuRef.current?.contains(target);
-
-      if (!insideTrigger && !insideMenu) {
-        setIsModelMenuOpen(false);
-      }
-    }
-
     function handleEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setIsModelMenuOpen(false);
         setIsSettingsOpen(false);
         if (isVoiceChatOpen) {
           closeVoiceChat();
@@ -398,56 +481,34 @@ export function DesktopShell() {
       }
     }
 
-    document.addEventListener("mousedown", handlePointerDown);
     document.addEventListener("keydown", handleEscape);
 
     return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleEscape);
     };
   }, [isVoiceChatOpen]);
-
-  useEffect(() => {
-    if (!isModelMenuOpen) {
-      return;
-    }
-
-    function updateMenuPosition() {
-      const rect = modelTriggerRef.current?.getBoundingClientRect();
-      if (!rect) {
-        return;
-      }
-
-      const width = Math.min(360, window.innerWidth - 24);
-      const left = Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12));
-
-      setModelMenuPosition({
-        top: rect.bottom + 10,
-        left,
-        width
-      });
-    }
-
-    updateMenuPosition();
-    window.addEventListener("resize", updateMenuPosition);
-    window.addEventListener("scroll", updateMenuPosition, true);
-
-    return () => {
-      window.removeEventListener("resize", updateMenuPosition);
-      window.removeEventListener("scroll", updateMenuPosition, true);
-    };
-  }, [isModelMenuOpen]);
 
   const activeConversation = useMemo(() => {
     const selected = conversations.find((conversation) => conversation.id === selectedConversationId);
     return selected ?? conversations[0] ?? null;
   }, [conversations, selectedConversationId]);
+  const activeMessages = activeConversation?.messages ?? [];
 
-  const recentConversations = conversations;
-  const selectedModel = useMemo(
-    () => getChatModelOption(settings.defaultModel),
-    [settings.defaultModel]
-  );
+  const deferredChatSearchQuery = useDeferredValue(chatSearchQuery.trim().toLowerCase());
+  const recentConversations = useMemo(() => {
+    if (!deferredChatSearchQuery) {
+      return conversations;
+    }
+
+    return conversations.filter((conversation) => {
+      const titleMatch = conversation.title.toLowerCase().includes(deferredChatSearchQuery);
+      const messageMatch = conversation.messages.some((message) =>
+        message.content.toLowerCase().includes(deferredChatSearchQuery)
+      );
+
+      return titleMatch || messageMatch;
+    });
+  }, [conversations, deferredChatSearchQuery]);
   const inputDevices = useMemo(
     () => audioDevices.filter((device) => device.kind === "audioinput"),
     [audioDevices]
@@ -456,9 +517,38 @@ export function DesktopShell() {
     () => audioDevices.filter((device) => device.kind === "audiooutput"),
     [audioDevices]
   );
-  const isUsingDesktopAi = usesDesktopAiBridge(settings.apiBaseUrl);
-  const needsDesktopApiKey = isUsingDesktopAi && !settings.openAiApiKey.trim();
   const text = getAppText(settings.language);
+  const generatedImages = useMemo(
+    () =>
+      conversations
+        .flatMap((conversation) =>
+          conversation.messages.flatMap((message) => {
+            if (message.role !== "assistant" || message.meta?.generation !== "image") {
+              return [];
+            }
+
+            const image = extractGeneratedImage(message.content);
+            if (!image) {
+              return [];
+            }
+
+            return [
+              {
+                id: `${conversation.id}:${message.id}`,
+                conversationId: conversation.id,
+                messageId: message.id,
+                url: image.url,
+                label: image.label,
+                createdAt: message.createdAt
+              } satisfies GeneratedImageEntry
+            ];
+          })
+        )
+        .sort(
+          (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+        ),
+    [conversations]
+  );
   const liveScreenSessionTurns = useMemo(
     () =>
       activeConversation
@@ -630,6 +720,46 @@ export function DesktopShell() {
       .join("\n\n");
   }
 
+  async function completeAgentPlan(prompt: string, options?: { signal?: AbortSignal }) {
+    let responseText = "";
+
+    await streamChatResponse({
+      baseUrl: settings.apiBaseUrl,
+      mode: "chat",
+      model: settings.defaultModel,
+      temperature: 0.2,
+      systemPrompt:
+        "You are NovaMind AI's internal action planner. Return strict JSON only and never include hidden reasoning.",
+      messages: [{ role: "user", content: prompt }],
+      signal: options?.signal,
+      onDelta(chunk) {
+        responseText += chunk;
+      }
+    });
+
+    return responseText;
+  }
+
+  async function generateAgentContent(prompt: string, options?: { signal?: AbortSignal }) {
+    let responseText = "";
+
+    await streamChatResponse({
+      baseUrl: settings.apiBaseUrl,
+      mode: "chat",
+      model: settings.defaultModel,
+      temperature: Math.min(0.7, Math.max(0.2, settings.temperature)),
+      systemPrompt:
+        "You are NovaMind AI's content engine. Generate the requested content directly, cleanly, and in the requested format. Do not include hidden reasoning.",
+      messages: [{ role: "user", content: prompt }],
+      signal: options?.signal,
+      onDelta(chunk) {
+        responseText += chunk;
+      }
+    });
+
+    return responseText.trim();
+  }
+
   async function openAttachmentPreview(attachment: AttachmentRecord) {
     setPreviewAttachment(attachment);
     setPreviewData(null);
@@ -644,6 +774,23 @@ export function DesktopShell() {
     } finally {
       setIsPreviewLoading(false);
     }
+  }
+
+  function openGeneratedImagePreview(image: GeneratedImageEntry) {
+    setPreviewAttachment({
+      id: image.id,
+      kind: "image",
+      name: buildGeneratedImageName(image.label),
+      size: 0,
+      mimeType: "image/png",
+      previewKind: "image"
+    });
+    setPreviewData({
+      kind: "image",
+      url: image.url
+    });
+    setPreviewError(null);
+    setIsPreviewLoading(false);
   }
 
   function trimVoiceTurns(turns: VoiceChatTurn[]) {
@@ -972,12 +1119,7 @@ export function DesktopShell() {
       setVoiceChatStatus("speaking");
       const blob =
         queuedItem.blobPromise ??
-        requestSpeechBlob(
-          settings.apiBaseUrl,
-          queuedItem.text,
-          settings.voiceName,
-          settings.openAiApiKey
-        );
+        requestSpeechBlob(settings.apiBaseUrl, queuedItem.text, settings.voiceName);
       const resolvedBlob = await blob;
 
       if (
@@ -992,8 +1134,7 @@ export function DesktopShell() {
         upcoming.blobPromise = requestSpeechBlob(
           settings.apiBaseUrl,
           upcoming.text,
-          settings.voiceName,
-          settings.openAiApiKey
+          settings.voiceName
         );
       }
 
@@ -1069,12 +1210,7 @@ export function DesktopShell() {
       !voiceSpeechQueueRef.current[0].blobPromise
     ) {
       const first = voiceSpeechQueueRef.current[0];
-      first.blobPromise = requestSpeechBlob(
-        settings.apiBaseUrl,
-        first.text,
-        settings.voiceName,
-        settings.openAiApiKey
-      );
+      first.blobPromise = requestSpeechBlob(settings.apiBaseUrl, first.text, settings.voiceName);
     }
 
     void pumpVoiceSpeechQueue(sessionId);
@@ -1146,12 +1282,6 @@ export function DesktopShell() {
 
   async function beginVoiceListening(sessionId = voiceSessionIdRef.current) {
     if (!voiceLoopEnabledRef.current || sessionId !== voiceSessionIdRef.current) {
-      return;
-    }
-
-    if (needsDesktopApiKey) {
-      setVoiceChatStatus("error");
-      setVoiceChatError(text.addApiKeyPrompt);
       return;
     }
 
@@ -1257,7 +1387,7 @@ export function DesktopShell() {
         }
 
         setVoiceChatStatus(usingScreenContext ? "thinking" : "transcribing");
-        void transcribeAudio(settings.apiBaseUrl, audio, settings.openAiApiKey)
+        void transcribeAudio(settings.apiBaseUrl, audio)
           .then(async (result) => {
             const transcript = result.text.trim();
 
@@ -1402,110 +1532,6 @@ export function DesktopShell() {
     }, 120);
   }
 
-  function renderModelPicker() {
-    if (!isModelMenuOpen || typeof document === "undefined") {
-      return null;
-    }
-
-    return createPortal(
-      <div className="pointer-events-none fixed inset-0 z-[140]">
-        <div
-          ref={modelMenuRef}
-          className="pointer-events-auto fixed overflow-hidden rounded-[30px] border border-border/80 bg-card/95 shadow-[0_28px_80px_rgba(15,23,42,0.58)] backdrop-blur-xl"
-          style={{
-            top: modelMenuPosition.top,
-            left: modelMenuPosition.left,
-            width: modelMenuPosition.width
-          }}
-        >
-          <div className="border-b border-border/80 px-4 py-4">
-            <div className="text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
-              {text.modelPickerTitle}
-            </div>
-            <div className="mt-2 text-sm text-muted-foreground">
-              {text.modelPickerDescription}
-            </div>
-          </div>
-
-          <div className="max-h-[420px] space-y-4 overflow-y-auto px-4 py-4">
-            {chatModelGroups.map((group) => (
-              <div key={group.id}>
-                <div className="text-[10px] uppercase tracking-[0.24em] text-primary/80">
-                  {group.label}
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">{group.description}</div>
-                <div className="mt-3 space-y-2">
-                  {group.options.map((model) => {
-                    const active = settings.defaultModel === model.id;
-
-                    return (
-                      <button
-                        key={model.id}
-                        type="button"
-                        onClick={() => {
-                          setSettings((current) => ({
-                            ...current,
-                            defaultModel: model.id
-                          }));
-                          setIsModelMenuOpen(false);
-                        }}
-                        className={`w-full rounded-[22px] border px-3 py-3 text-left transition ${
-                          active
-                            ? "border-primary/30 bg-primary/10"
-                            : "border-border/80 bg-card/60 hover:border-border hover:bg-card"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="text-sm font-medium text-foreground">{model.label}</div>
-                            <div className="mt-1 text-xs text-muted-foreground">{model.id}</div>
-                            <div className="mt-2 text-xs leading-6 text-muted-foreground">
-                              {model.description}
-                            </div>
-                            {model.note ? (
-                              <div className="mt-2 text-[11px] text-amber-500">
-                                {model.note}
-                              </div>
-                            ) : null}
-                          </div>
-                          <div className="mt-0.5 shrink-0">
-                            {active ? (
-                              <div className="flex h-8 w-8 items-center justify-center rounded-full border border-primary/30 bg-primary/15 text-primary">
-                                <Check className="h-4 w-4" />
-                              </div>
-                            ) : null}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="border-t border-border/80 px-4 py-4">
-            <div className="text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
-              {text.customModelId}
-            </div>
-            <Input
-              value={settings.defaultModel}
-              onChange={(event) =>
-                setSettings((current) => ({
-                  ...current,
-                  defaultModel: event.target.value
-                }))
-              }
-              placeholder={text.enterAnotherModelId}
-              className="mt-3"
-            />
-          </div>
-        </div>
-      </div>,
-      document.body
-    );
-  }
-
   async function speakMessage(messageId: string, text: string) {
     if (!text.trim()) return;
 
@@ -1515,8 +1541,7 @@ export function DesktopShell() {
       const blob = await requestSpeechBlob(
         settings.apiBaseUrl,
         text,
-        settings.voiceName,
-        settings.openAiApiKey
+        settings.voiceName
       );
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
@@ -1588,6 +1613,161 @@ export function DesktopShell() {
     }
   }
 
+  async function runAgentThroughConversation(
+    conversation: Conversation,
+    rawInput: string,
+    options?: SendMessageOptions
+  ) {
+    const parsed = parseSmartCommand(rawInput);
+    const content = parsed.content.trim();
+    const source = options?.source ?? "chat";
+    const attachments = options?.attachments ?? pendingAttachments;
+
+    if (!content && attachments.length === 0) {
+      return false;
+    }
+
+    const timestamp = new Date().toISOString();
+    const userMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: content || text.readyForQuestions,
+      createdAt: timestamp,
+      meta: {
+        command: parsed.command,
+        source,
+        attachments
+      }
+    };
+    const assistantId = crypto.randomUUID();
+    const assistantMessage: ChatMessage = {
+      id: assistantId,
+      role: "assistant",
+      content: "",
+      createdAt: timestamp,
+      meta: {
+        source
+      }
+    };
+
+    updateConversation(conversation.id, (current) => ({
+      ...current,
+      title:
+        current.messages.length === 0
+          ? makeConversationTitle(content || attachments[0]?.name || text.newSession)
+          : current.title,
+      updatedAt: timestamp,
+      messages: [...current.messages, userMessage, assistantMessage]
+    }));
+
+    if (options?.attachments === undefined) {
+      setPendingAttachments([]);
+    }
+    setComposerError(null);
+    setPendingConversationId(conversation.id);
+
+    try {
+      const store = memory_store();
+      const agentInput = buildMessageContentForModel(content, attachments);
+      extractMemoryCandidates(agentInput, userMessage.id).forEach((candidate) => {
+        store.advanced.addOrUpdateItem(candidate);
+        store.advanced.addActivity({
+          type: "store_memory",
+          label: "Stored memory preference",
+          detail: candidate.key,
+          status: "completed"
+        });
+      });
+      const relevantMemory = retrieveRelevantMemory(agentInput).map((item) => ({
+        id: item.id,
+        type: "memory" as const,
+        title: `${item.type}: ${item.key}`,
+        content: item.value,
+        score: item.confidence
+      }));
+      const conversationFiles = getConversationFilesFor(conversation);
+      const plan = await planner(agentInput, {
+        relevantContext: [
+          ...store.retrieveRelevantContext(agentInput),
+          ...relevantMemory,
+          ...fileContextItems(conversationFiles)
+        ],
+        conversationFiles,
+        completePlan: completeAgentPlan,
+        signal: options?.signal
+      });
+      const executedActions = await executor(plan.actions, {
+        store,
+        signal: options?.signal,
+        generateText: generateAgentContent,
+        saveFileToDesktop: desktopSaveAgentFile,
+        conversationId: conversation.id,
+        sourceMessageId: userMessage.id,
+        userInput: agentInput,
+        conversationFiles
+      });
+      const agentRun: AgentRunResult = {
+        message: plan.message,
+        actions: plan.actions,
+        executedActions,
+        createdAt: new Date().toISOString()
+      };
+
+      updateConversation(conversation.id, (current) => ({
+        ...current,
+        updatedAt: new Date().toISOString(),
+        files: mergeConversationFiles(current.files, conversationFiles, generatedFilesFromRun(agentRun)),
+        messages: current.messages.map((message) => {
+          const syncedMessage = syncMessageFileCards(
+            message,
+            mergeConversationFiles(current.files, conversationFiles, generatedFilesFromRun(agentRun))
+          );
+          return syncedMessage.id === assistantId
+            ? {
+                ...syncedMessage,
+                content: agentRun.message,
+                meta: {
+                  ...syncedMessage.meta,
+                  agentRun
+                }
+              }
+            : syncedMessage;
+        })
+      }));
+
+      if (options?.autoSpeakReply) {
+        const agentSpeechSessionId = Date.now();
+        queueVoiceSpeech(agentRun.message, agentSpeechSessionId, true);
+        void pumpVoiceSpeechQueue(agentSpeechSessionId);
+      }
+    } catch (error) {
+      if (isAbortError(error)) {
+        updateConversation(conversation.id, (current) => ({
+          ...current,
+          updatedAt: new Date().toISOString(),
+          messages: current.messages.map((message) =>
+            message.id === assistantId ? { ...message, content: "Stopped.", meta: { ...message.meta, stopped: true } } : message
+          )
+        }));
+        return true;
+      }
+
+      const errorText = getErrorMessage(error, "Agent execution failed.");
+      options?.onError?.(errorText);
+      updateConversation(conversation.id, (current) => ({
+        ...current,
+        updatedAt: new Date().toISOString(),
+        messages: current.messages.map((message) =>
+          message.id === assistantId ? { ...message, content: `Error: ${errorText}` } : message
+        )
+      }));
+    } finally {
+      setPendingConversationId(null);
+    }
+
+    return true;
+  }
+
   async function sendMessageThroughConversation(
     conversation: Conversation,
     rawInput: string,
@@ -1607,6 +1787,20 @@ export function DesktopShell() {
 
     if (!content && attachments.length === 0) {
       return false;
+    }
+
+    if (
+      source === "chat" &&
+      !resolvedImageDataUrl &&
+      !parsed.command &&
+      options?.webSearch !== true &&
+      isAgentRequest(content)
+    ) {
+      return runAgentThroughConversation(
+        conversation,
+        rawInput,
+        options?.attachments === undefined ? options : { ...options, attachments }
+      );
     }
 
     const timestamp = new Date().toISOString();
@@ -1678,11 +1872,10 @@ export function DesktopShell() {
         model: settings.defaultModel,
         temperature: settings.temperature,
         systemPrompt: createRuntimeSystemPrompt(),
-        apiKey: settings.openAiApiKey,
         command: parsed.command,
         signal: options?.signal,
         imageDataUrl: resolvedImageDataUrl,
-        webSearch: !resolvedImageDataUrl,
+        webSearch: options?.webSearch ?? !resolvedImageDataUrl,
         inputMethod,
         messages: payloadMessages,
         onDelta(chunk) {
@@ -1728,11 +1921,18 @@ export function DesktopShell() {
         updateConversation(conversation.id, (current) => ({
           ...current,
           updatedAt: new Date().toISOString(),
-          messages: partialText
-            ? current.messages.map((message) =>
-                message.id === assistantId ? { ...message, content: partialText } : message
-              )
-            : current.messages.filter((message) => message.id !== assistantId)
+          messages: current.messages.map((message) =>
+            message.id === assistantId
+              ? {
+                  ...message,
+                  content: partialText || "Stopped.",
+                  meta: {
+                    ...message.meta,
+                    stopped: true
+                  }
+                }
+              : message
+          )
         }));
 
         return true;
@@ -1756,6 +1956,223 @@ export function DesktopShell() {
     return true;
   }
 
+  async function respondToExistingUserMessage(
+    conversationId: string,
+    baseMessages: ChatMessage[],
+    userMessage: ChatMessage,
+    options: SendMessageOptions
+  ) {
+    const parsed = parseSmartCommand(userMessage.content);
+    const content = parsed.content.trim();
+    const source = userMessage.meta?.source ?? options.source ?? "chat";
+    const attachments = userMessage.meta?.attachments ?? [];
+    const assistantId = crypto.randomUUID();
+    const timestamp = new Date().toISOString();
+    const assistantMessage: ChatMessage = {
+      id: assistantId,
+      role: "assistant",
+      content: "",
+      createdAt: timestamp,
+      meta: { source }
+    };
+
+    updateConversation(conversationId, (current) => ({
+      ...current,
+      updatedAt: timestamp,
+      messages: [...baseMessages, userMessage, assistantMessage]
+    }));
+
+    setComposerError(null);
+    setPendingConversationId(conversationId);
+
+    try {
+      const modelInput = buildMessageContentForModel(content, attachments);
+
+      if (source === "chat" && isAgentRequest(content)) {
+        const store = memory_store();
+        extractMemoryCandidates(modelInput, userMessage.id).forEach((candidate) => {
+          store.advanced.addOrUpdateItem(candidate);
+          store.advanced.addActivity({
+            type: "store_memory",
+            label: "Stored memory preference",
+            detail: candidate.key,
+            status: "completed"
+          });
+        });
+        const relevantMemory = retrieveRelevantMemory(modelInput).map((item) => ({
+          id: item.id,
+          type: "memory" as const,
+          title: `${item.type}: ${item.key}`,
+          content: item.value,
+          score: item.confidence
+        }));
+        const conversationSnapshot = conversations.find((item) => item.id === conversationId);
+        const conversationFiles = getConversationFilesFor(conversationSnapshot);
+        const plan = await planner(modelInput, {
+          relevantContext: [
+            ...store.retrieveRelevantContext(modelInput),
+            ...relevantMemory,
+            ...fileContextItems(conversationFiles)
+          ],
+          conversationFiles,
+          completePlan: completeAgentPlan,
+          signal: options.signal
+        });
+        const executedActions = await executor(plan.actions, {
+          store,
+          signal: options.signal,
+          generateText: generateAgentContent,
+          saveFileToDesktop: desktopSaveAgentFile,
+          conversationId,
+          sourceMessageId: userMessage.id,
+          userInput: modelInput,
+          conversationFiles
+        });
+        const agentRun: AgentRunResult = {
+          message: plan.message,
+          actions: plan.actions,
+          executedActions,
+          createdAt: new Date().toISOString()
+        };
+
+        updateConversation(conversationId, (current) => ({
+          ...current,
+          updatedAt: new Date().toISOString(),
+          files: mergeConversationFiles(current.files, conversationFiles, generatedFilesFromRun(agentRun)),
+          messages: current.messages.map((message) => {
+            const syncedMessage = syncMessageFileCards(
+              message,
+              mergeConversationFiles(current.files, conversationFiles, generatedFilesFromRun(agentRun))
+            );
+            return syncedMessage.id === assistantId
+              ? {
+                  ...syncedMessage,
+                  content: agentRun.message,
+                  meta: {
+                    ...syncedMessage.meta,
+                    agentRun
+                  }
+                }
+              : syncedMessage;
+          })
+        }));
+        return true;
+      }
+
+      let aggregated = "";
+      const payloadMessages = [...baseMessages, userMessage].map((message) => ({
+        role: message.role,
+        content: message.id === userMessage.id ? modelInput : message.content
+      }));
+
+      await streamChatResponse({
+        baseUrl: settings.apiBaseUrl,
+        mode: "chat",
+        model: settings.defaultModel,
+        temperature: settings.temperature,
+        systemPrompt: createRuntimeSystemPrompt(),
+        command: parsed.command,
+        signal: options.signal,
+        webSearch: options.webSearch ?? true,
+        inputMethod: "text",
+        messages: payloadMessages,
+        onDelta(chunk) {
+          aggregated += chunk;
+          updateConversation(conversationId, (current) => ({
+            ...current,
+            updatedAt: new Date().toISOString(),
+            messages: current.messages.map((message) =>
+              message.id === assistantId ? { ...message, content: aggregated } : message
+            )
+          }));
+        }
+      });
+
+      const finalText = aggregated.trim() || "NovaMind returned an empty response.";
+      updateConversation(conversationId, (current) => ({
+        ...current,
+        updatedAt: new Date().toISOString(),
+        messages: current.messages.map((message) =>
+          message.id === assistantId ? { ...message, content: finalText } : message
+        )
+      }));
+      return true;
+    } catch (error) {
+      if (isAbortError(error)) {
+        updateConversation(conversationId, (current) => ({
+          ...current,
+          updatedAt: new Date().toISOString(),
+          messages: current.messages.map((message) =>
+            message.id === assistantId
+              ? {
+                  ...message,
+                  content: message.content.trim() || "Stopped.",
+                  meta: {
+                    ...message.meta,
+                    stopped: true
+                  }
+                }
+              : message
+          )
+        }));
+        return true;
+      }
+
+      const errorText = getErrorMessage(error, "The request failed.");
+      updateConversation(conversationId, (current) => ({
+        ...current,
+        updatedAt: new Date().toISOString(),
+        messages: current.messages.map((message) =>
+          message.id === assistantId ? { ...message, content: `Error: ${errorText}` } : message
+        )
+      }));
+      return true;
+    } finally {
+      setPendingConversationId(null);
+    }
+  }
+
+  async function handleEditUserMessage(messageId: string, nextContent: string) {
+    const conversation = activeConversation;
+    const content = nextContent.trim();
+    if (!conversation || !content || pendingConversationId) {
+      return;
+    }
+
+    const messageIndex = conversation.messages.findIndex(
+      (message) => message.id === messageId && message.role === "user"
+    );
+    if (messageIndex === -1) {
+      return;
+    }
+
+    const originalMessage = conversation.messages[messageIndex];
+    const baseMessages = conversation.messages.slice(0, messageIndex);
+    const editedMessage: ChatMessage = {
+      ...originalMessage,
+      content,
+      createdAt: new Date().toISOString()
+    };
+    const controller = createComposerAbortController();
+
+    updateConversation(conversation.id, (current) => ({
+      ...current,
+      updatedAt: new Date().toISOString(),
+      messages: [...baseMessages, editedMessage]
+    }));
+
+    try {
+      await respondToExistingUserMessage(conversation.id, baseMessages, editedMessage, {
+        source: editedMessage.meta?.source ?? "chat",
+        signal: controller.signal
+      });
+    } finally {
+      if (activeRequestAbortRef.current === controller) {
+        activeRequestAbortRef.current = null;
+      }
+    }
+  }
+
   async function sendConversationMessage(
     rawInput: string,
     options?: SendMessageOptions
@@ -1776,6 +2193,127 @@ export function DesktopShell() {
     }
 
     return sendMessageThroughConversation(conversation, rawInput, options);
+  }
+
+  async function sendImageGenerationMessage(rawInput: string, options?: { signal?: AbortSignal }) {
+    const conversation = activeConversation;
+    const prompt = rawInput.trim();
+
+    if (!conversation || !prompt) {
+      return false;
+    }
+
+    const timestamp = new Date().toISOString();
+    const userMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: prompt,
+      createdAt: timestamp,
+      meta: {
+        source: "chat"
+      }
+    };
+    const assistantId = crypto.randomUUID();
+    const assistantMessage: ChatMessage = {
+      id: assistantId,
+      role: "assistant",
+      content: "",
+      createdAt: timestamp,
+      meta: {
+        source: "chat",
+        generation: "image"
+      }
+    };
+
+    updateConversation(conversation.id, (current) => ({
+      ...current,
+      title:
+        current.messages.length === 0
+          ? makeConversationTitle(prompt || text.newSession)
+          : current.title,
+      updatedAt: timestamp,
+      messages: [...current.messages, userMessage, assistantMessage]
+    }));
+
+    setPendingAttachments([]);
+    setPendingConversationId(conversation.id);
+    setComposerError(null);
+
+    try {
+      const result = await generateImageFromPrompt(settings.apiBaseUrl, prompt, {
+        signal: options?.signal
+      });
+      const finalText = `${text.imageGenerated}\n\n![${truncate(prompt, 72)}](${result.imageDataUrl})`;
+
+      updateConversation(conversation.id, (current) => ({
+        ...current,
+        updatedAt: new Date().toISOString(),
+        messages: current.messages.map((message) =>
+          message.id === assistantId ? { ...message, content: finalText } : message
+        )
+      }));
+      return true;
+    } catch (error) {
+      if (isAbortError(error)) {
+        updateConversation(conversation.id, (current) => ({
+          ...current,
+          updatedAt: new Date().toISOString(),
+          messages: current.messages.map((message) =>
+            message.id === assistantId
+              ? {
+                  ...message,
+                  content: "Stopped.",
+                  meta: {
+                    ...message.meta,
+                    stopped: true
+                  }
+                }
+              : message
+          )
+        }));
+        return true;
+      }
+
+      updateConversation(conversation.id, (current) => ({
+        ...current,
+        updatedAt: new Date().toISOString(),
+        messages: current.messages.map((message) =>
+          message.id === assistantId
+            ? {
+                ...message,
+                content: `Error: ${getErrorMessage(error, "Image generation failed.")}`
+              }
+            : message
+        )
+      }));
+      return true;
+    } finally {
+      setPendingConversationId(null);
+    }
+  }
+
+  async function handleComposerSend(
+    rawInput: string,
+    options?: {
+      quickAction?: ComposerQuickAction | null;
+    }
+  ) {
+    const controller = createComposerAbortController();
+
+    try {
+      if (options?.quickAction === "image") {
+        return await sendImageGenerationMessage(rawInput, { signal: controller.signal });
+      }
+
+      return await sendConversationMessage(rawInput, {
+        webSearch: options?.quickAction === "web-search" ? true : undefined,
+        signal: controller.signal
+      });
+    } finally {
+      if (activeRequestAbortRef.current === controller) {
+        activeRequestAbortRef.current = null;
+      }
+    }
   }
 
   function appendResolvedToolResult(
@@ -2056,8 +2594,7 @@ export function DesktopShell() {
         settings.apiBaseUrl,
         cropped,
         screenAssistant.prompt,
-        settings.defaultModel,
-        settings.openAiApiKey
+        settings.defaultModel
       );
 
       appendResolvedToolResult(
@@ -2081,8 +2618,11 @@ export function DesktopShell() {
   return (
     <div className="app-shell relative min-h-screen overflow-hidden">
       <div className="hero-grid absolute inset-0 opacity-50" />
+      <div className="pointer-events-none fixed right-4 top-4 z-40 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-slate-200/80 backdrop-blur-xl">
+        {text.betaVersion}
+      </div>
 
-      <div className="relative mx-auto flex h-screen w-full max-w-[1080px] flex-col px-3 py-3 sm:px-5 sm:py-4">
+      <div className="relative mx-auto flex h-screen w-full max-w-[1680px] flex-col px-3 py-3 sm:px-4 sm:py-4 xl:px-6">
         <header className="glass-panel relative z-20 flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <div className="flex min-w-0 items-center gap-3">
             <img
@@ -2100,32 +2640,7 @@ export function DesktopShell() {
             </div>
           </div>
 
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
-            <button
-              ref={modelTriggerRef}
-              type="button"
-              onClick={() => setIsModelMenuOpen((current) => !current)}
-              className="w-full min-w-0 rounded-[22px] border border-border/80 bg-card/75 px-3 py-2 text-left transition hover:border-border hover:bg-card sm:min-w-[220px] sm:max-w-[340px]"
-            >
-              <div className="text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
-                {text.model}
-              </div>
-              <div className="mt-1 flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium text-foreground">
-                    {selectedModel?.label ?? settings.defaultModel}
-                  </div>
-                  <div className="truncate text-xs text-muted-foreground">
-                    {selectedModel?.description ?? "Custom model ID"}
-                  </div>
-                </div>
-                <ChevronDown
-                  className={`h-4 w-4 shrink-0 text-muted-foreground transition ${
-                    isModelMenuOpen ? "rotate-180" : ""
-                  }`}
-                />
-              </div>
-            </button>
+          <div className="flex w-full justify-start sm:w-auto sm:justify-end">
             <Button variant="secondary" onClick={handleNewConversation} className="w-full sm:w-auto">
               <Plus className="h-4 w-4" />
               {text.newChat}
@@ -2133,16 +2648,80 @@ export function DesktopShell() {
           </div>
         </header>
 
-        <div className="mt-3 grid min-h-0 flex-1 gap-3 sm:mt-4 sm:gap-4 lg:grid-cols-[248px_minmax(0,1fr)]">
-          <aside className="glass-panel hidden min-h-0 flex-col overflow-hidden p-4 lg:flex">
+        <div className="mt-3 grid min-h-0 flex-1 grid-cols-[72px_minmax(0,1fr)] gap-2 sm:mt-4 sm:grid-cols-[240px_minmax(0,1fr)] sm:gap-4 xl:grid-cols-[280px_minmax(0,1fr)] 2xl:grid-cols-[320px_minmax(0,1fr)]">
+          <aside className="glass-panel flex min-h-0 min-w-0 flex-col overflow-hidden p-2 sm:p-4">
+            <nav className="mb-3 grid gap-2">
+              {[
+                {
+                  id: "chat",
+                  label: text.chat,
+                  count: conversations.length,
+                  icon: MessageSquareText,
+                  active: true,
+                  onClick: () => setIsSettingsOpen(false)
+                },
+                {
+                  id: "settings",
+                  label: text.settings,
+                  count: null,
+                  icon: Settings2,
+                  active: isSettingsOpen,
+                  onClick: () => setIsSettingsOpen((current) => !current)
+                }
+              ].map((item) => {
+                const Icon = item.icon;
+
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={item.onClick}
+                    title={item.label}
+                    className={`flex h-12 items-center justify-center gap-3 rounded-[20px] border px-0 text-sm font-medium transition sm:justify-start sm:px-3 ${
+                      item.active
+                        ? "border-primary/30 bg-primary/12 text-foreground shadow-[0_16px_40px_rgba(56,189,248,0.12)]"
+                        : "border-border/75 bg-card/[0.62] text-muted-foreground hover:border-primary/25 hover:bg-card/80 hover:text-foreground"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4 shrink-0 text-primary" />
+                    <span className="hidden min-w-0 flex-1 truncate text-left sm:block">
+                      {item.label}
+                    </span>
+                    {item.count !== null ? (
+                      <span className="hidden rounded-full border border-border/80 bg-background/55 px-2 py-0.5 text-[11px] text-muted-foreground sm:inline-flex">
+                        {item.count}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </nav>
+
+            <div className="hidden min-h-0 flex-1 flex-col sm:flex">
             <div className="mb-4 flex items-center justify-between">
               <div className="font-heading text-lg font-semibold text-foreground">
                 {text.recentChats}
               </div>
-              <Badge>{conversations.length}</Badge>
+              <Badge>{recentConversations.length}</Badge>
+            </div>
+
+            <div className="relative mb-4">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={chatSearchQuery}
+                onChange={(event) => setChatSearchQuery(event.target.value)}
+                placeholder={text.searchChats}
+                className="h-11 pl-11"
+              />
             </div>
 
             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
+              {recentConversations.length === 0 && deferredChatSearchQuery ? (
+                <div className="rounded-[24px] border border-border/80 bg-card/70 px-4 py-4 text-sm text-muted-foreground">
+                  {text.searchNoResults}
+                </div>
+              ) : null}
+
               {recentConversations.map((conversation) => {
                 const active = conversation.id === activeConversation?.id;
 
@@ -2196,19 +2775,50 @@ export function DesktopShell() {
               })}
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsSettingsOpen((current) => !current)}
-              className="mt-4 flex items-center gap-2 self-start rounded-full border border-border/80 bg-card/75 px-3 py-2 text-sm text-foreground transition hover:border-border hover:bg-card"
-            >
-              <Settings2 className="h-4 w-4" />
-              {text.settings}
-            </button>
+            <div className="mt-4 rounded-[24px] border border-border/80 bg-card/70 p-3">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <ImageIcon className="h-4 w-4 text-primary" />
+                  {text.imagesLibrary}
+                </div>
+                <Badge>{generatedImages.length}</Badge>
+              </div>
+
+              {generatedImages.length > 0 ? (
+                <div className="grid max-h-48 grid-cols-2 gap-2 overflow-y-auto pr-1">
+                  {generatedImages.map((image) => (
+                    <button
+                      key={image.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedConversationId(image.conversationId);
+                        openGeneratedImagePreview(image);
+                      }}
+                      className="overflow-hidden rounded-2xl border border-border/80 bg-background/70 transition hover:border-primary/35 hover:bg-card"
+                    >
+                      <img
+                        src={image.url}
+                        alt={image.label}
+                        className="aspect-square w-full object-cover"
+                        loading="lazy"
+                      />
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-border/70 bg-background/45 px-3 py-4 text-sm text-muted-foreground">
+                  {text.noImagesYet}
+                </div>
+              )}
+            </div>
+
+            </div>
           </aside>
 
-          <main className="glass-panel flex min-h-0 flex-col overflow-hidden">
-            <div className="flex flex-col gap-3 border-b border-border/80 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5">
-              <div className="min-w-0 flex-1">
+          <main className="glass-panel flex min-h-0 min-w-0 flex-col overflow-hidden">
+            <div className="flex flex-col gap-4 border-b border-border/80 px-3 py-3 sm:px-5 sm:py-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 flex-1">
                 {isRenamingConversation ? (
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <Input
@@ -2217,16 +2827,16 @@ export function DesktopShell() {
                       className="h-11 w-full min-w-0 sm:min-w-[240px]"
                     />
                     <div className="flex items-center gap-2">
-                    <Button variant="secondary" size="icon" onClick={saveConversationTitle}>
-                      <Check className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setIsRenamingConversation(false)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                      <Button variant="secondary" size="icon" onClick={saveConversationTitle}>
+                        <Check className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setIsRenamingConversation(false)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 ) : (
@@ -2245,52 +2855,63 @@ export function DesktopShell() {
                   </div>
                 )}
                 <div className="mt-1 text-sm text-muted-foreground">{text.writeMessage}</div>
-              </div>
+                </div>
 
-              <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
-                <Badge>
-                  {activeConversation?.messages.length ?? 0} {text.messages}
-                </Badge>
-                <Button
-                  variant="secondary"
-                  onClick={() => activeConversation && handleDeleteConversation(activeConversation.id)}
-                  disabled={!activeConversation}
-                  className="w-full sm:w-auto"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  {text.deleteChat}
-                </Button>
+                <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+                  <Badge>
+                    {activeMessages.length} {text.messages}
+                  </Badge>
+                  <Button
+                    variant="secondary"
+                    onClick={() => activeConversation && handleDeleteConversation(activeConversation.id)}
+                    disabled={!activeConversation}
+                    className="w-full sm:w-auto"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {text.deleteChat}
+                  </Button>
+                </div>
               </div>
             </div>
 
-            {needsDesktopApiKey ? (
-              <div className="border-b border-border/80 px-4 py-4 sm:px-5">
-                <div className="rounded-[24px] border border-amber-400/25 bg-amber-400/10 px-4 py-3 text-sm text-foreground">
-                  {text.addApiKeyPrompt}
-                </div>
-              </div>
-            ) : null}
-
             <ChatWindow
-              messages={activeConversation?.messages ?? []}
+              messages={activeMessages}
               emptyTitle={text.emptyChatTitle}
               emptyDescription={text.emptyChatDescription}
               speakingMessageId={speakingMessageId}
               onSpeak={speakMessage}
+              onEditUserMessage={handleEditUserMessage}
               language={settings.language}
               onOpenAttachment={openAttachmentPreview}
+              onOpenGeneratedImage={(image) =>
+                openGeneratedImagePreview({
+                  id: `preview:${image.label}`,
+                  conversationId: activeConversation?.id ?? selectedConversationId ?? "preview",
+                  messageId: crypto.randomUUID(),
+                  url: image.url,
+                  label: image.label,
+                  createdAt: new Date().toISOString()
+                })
+              }
             />
 
-            <div className="border-t border-border/80 p-4 sm:p-5">
-              <div className="mx-auto w-full max-w-[840px]">
+            <div className="border-t border-border/80 p-3 sm:p-5">
+              <div className="mx-auto w-full max-w-[1040px] 2xl:max-w-[1180px]">
                 <CompactComposer
                   apiBaseUrl={settings.apiBaseUrl}
-                  openAiApiKey={settings.openAiApiKey}
                   language={settings.language}
                   pendingAttachments={pendingAttachments}
                   isSending={pendingConversationId === activeConversation?.id}
                   isUploadingFile={isUploadingFile}
-                  onSend={sendConversationMessage}
+                  selectedModelId={settings.defaultModel}
+                  onSelectModel={(modelId) =>
+                    setSettings((current) => ({
+                      ...current,
+                      defaultModel: modelId
+                    }))
+                  }
+                  onSend={handleComposerSend}
+                  onStopGenerating={stopActiveGeneration}
                   onOpenScreenAssistant={openScreenAssistant}
                   onOpenVoiceChat={() => startVoiceAssistant("overlay")}
                   onFilesSelected={handleFilesSelected}
@@ -2318,17 +2939,6 @@ export function DesktopShell() {
           </main>
         </div>
       </div>
-
-      <button
-        type="button"
-        onClick={() => setIsSettingsOpen((current) => !current)}
-        className="fixed bottom-4 left-4 z-30 flex items-center gap-2 rounded-full border border-border/80 bg-card/90 px-3 py-2 text-sm text-foreground shadow-[0_18px_44px_rgba(15,23,42,0.45)] backdrop-blur-xl transition hover:border-border hover:bg-card lg:hidden"
-      >
-        <Settings2 className="h-4 w-4" />
-        {text.settings}
-      </button>
-
-      {renderModelPicker()}
 
       <FilePreviewModal
         attachment={previewAttachment}
@@ -2458,47 +3068,6 @@ export function DesktopShell() {
                     </button>
                   );
                 })}
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                {text.openAiApiKey}
-              </label>
-              <Input
-                type="password"
-                value={settings.openAiApiKey}
-                onChange={(event) =>
-                  setSettings((current) => ({
-                    ...current,
-                    openAiApiKey: event.target.value
-                  }))
-                }
-                placeholder={text.pasteOpenAiApiKey}
-              />
-              <div className="mt-2 text-xs leading-6 text-muted-foreground">
-                {text.builtInDesktopAiDescription}
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                {text.customApiUrl}
-              </label>
-              <Input
-                value={settings.apiBaseUrl}
-                onChange={(event) =>
-                  setSettings((current) => ({
-                    ...current,
-                    apiBaseUrl: event.target.value
-                  }))
-                }
-                placeholder={text.builtInDesktopAiActive}
-              />
-              <div className="mt-2 text-xs leading-6 text-muted-foreground">
-                {isUsingDesktopAi
-                  ? text.builtInDesktopAiActive
-                  : text.customApiUrlDescription}
               </div>
             </div>
 

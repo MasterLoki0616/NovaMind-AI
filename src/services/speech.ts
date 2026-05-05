@@ -3,9 +3,9 @@ import { usesDesktopAiBridge } from "../lib/runtime";
 import { desktopRequestSpeech, desktopTranscribeAudio } from "./desktop";
 import { fetchBlob, fetchFormData, fetchJson } from "./api";
 
-export async function transcribeAudio(baseUrl: string, audio: Blob, apiKey = "") {
+export async function transcribeAudio(baseUrl: string, audio: Blob) {
   if (usesDesktopAiBridge(baseUrl)) {
-    const text = await desktopTranscribeAudio(apiKey, audio);
+    const text = await desktopTranscribeAudio(audio);
     return { text };
   }
 
@@ -18,11 +18,10 @@ export async function transcribeAudio(baseUrl: string, audio: Blob, apiKey = "")
 export async function requestSpeechBlob(
   baseUrl: string,
   text: string,
-  voice: TtsVoice,
-  apiKey = ""
+  voice: TtsVoice
 ) {
   if (usesDesktopAiBridge(baseUrl)) {
-    return desktopRequestSpeech(apiKey, text, voice);
+    return desktopRequestSpeech(text, voice);
   }
 
   return fetchBlob(baseUrl, "/api/speech/tts", {
@@ -34,8 +33,8 @@ export async function requestSpeechBlob(
   });
 }
 
-export async function playSpeech(baseUrl: string, text: string, voice: TtsVoice, apiKey = "") {
-  const blob = await requestSpeechBlob(baseUrl, text, voice, apiKey);
+export async function playSpeech(baseUrl: string, text: string, voice: TtsVoice) {
+  const blob = await requestSpeechBlob(baseUrl, text, voice);
   const url = URL.createObjectURL(blob);
   const audio = new Audio(url);
 

@@ -44,7 +44,6 @@ struct ChatMessageInput {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DesktopChatRequest {
-    api_key: String,
     mode: AssistantMode,
     messages: Vec<ChatMessageInput>,
     model: String,
@@ -67,7 +66,6 @@ struct DesktopChatStreamRequest {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DesktopScreenRequest {
-    api_key: String,
     image_data_url: String,
     prompt: String,
     model: String,
@@ -76,7 +74,6 @@ struct DesktopScreenRequest {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DesktopTranscriptionRequest {
-    api_key: String,
     audio_base64: String,
     mime_type: String,
     file_name: String,
@@ -85,7 +82,6 @@ struct DesktopTranscriptionRequest {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DesktopSpeechRequest {
-    api_key: String,
     text: String,
     voice: String,
 }
@@ -93,7 +89,6 @@ struct DesktopSpeechRequest {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DesktopDocumentSummaryRequest {
-    api_key: String,
     file_name: String,
     extracted_text: String,
     model: String,
@@ -101,8 +96,25 @@ struct DesktopDocumentSummaryRequest {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct DesktopImageGenerationRequest {
+    prompt: String,
+    model: Option<String>,
+    size: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct DesktopFilePreviewRequest {
     path: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopSaveAgentFileRequest {
+    filename: String,
+    content: String,
+    content_base64: Option<String>,
+    mime_type: Option<String>,
 }
 
 #[derive(Clone, Serialize)]
@@ -148,6 +160,14 @@ struct DesktopFilePreviewResponse {
     truncated: bool,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DesktopSaveAgentFileResponse {
+    filename: String,
+    path: String,
+    bytes: u64,
+}
+
 #[tauri::command]
 fn capture_primary_screen() -> Result<String, String> {
     let screens = Screen::all().map_err(|error| error.to_string())?;
@@ -168,7 +188,7 @@ fn capture_primary_screen() -> Result<String, String> {
 
 #[tauri::command]
 async fn desktop_chat_completion(request: DesktopChatRequest) -> Result<String, String> {
-    ensure_api_key(&request.api_key)?;
+    let api_key = resolve_api_key()?;
 
     if request.messages.is_empty() {
         return Err(String::from("Chat history is required."));
@@ -217,7 +237,7 @@ async fn desktop_chat_completion(request: DesktopChatRequest) -> Result<String, 
 
     let response = send_chat_completion_request(
         &client,
-        &request.api_key,
+        &api_key,
         payload,
         request.web_search.unwrap_or(false) && request.image_data_url.as_ref().map(|value| value.trim().is_empty()).unwrap_or(true),
     )
@@ -233,7 +253,7 @@ async fn desktop_chat_stream(
     app: tauri::AppHandle,
     request: DesktopChatStreamRequest,
 ) -> Result<(), String> {
-    ensure_api_key(&request.chat.api_key)?;
+    let api_key = resolve_api_key()?;
 
     if request.chat.messages.is_empty() {
         return Err(String::from("Chat history is required."));
@@ -314,7 +334,7 @@ async fn desktop_chat_stream(
 
     let response = send_chat_completion_request(
         &client,
-        &request.chat.api_key,
+        &api_key,
         payload,
         request.chat.web_search.unwrap_or(false)
             && request
@@ -431,7 +451,7 @@ async fn desktop_chat_stream(
 
 #[tauri::command]
 async fn desktop_analyze_screen(request: DesktopScreenRequest) -> Result<String, String> {
-    ensure_api_key(&request.api_key)?;
+    let api_key = resolve_api_key()?;
 
     if request.image_data_url.trim().is_empty() {
         return Err(String::from("A captured screen image is required."));
@@ -463,7 +483,7 @@ async fn desktop_analyze_screen(request: DesktopScreenRequest) -> Result<String,
 
     let response = client
         .post(format!("{OPENAI_API_BASE}/chat/completions"))
-        .bearer_auth(request.api_key)
+        .bearer_auth(api_key)
         .json(&payload)
         .send()
         .await
@@ -476,7 +496,7 @@ async fn desktop_analyze_screen(request: DesktopScreenRequest) -> Result<String,
 
 #[tauri::command]
 async fn desktop_transcribe_audio(request: DesktopTranscriptionRequest) -> Result<String, String> {
-    ensure_api_key(&request.api_key)?;
+    let api_key = resolve_api_key()?;
 
     let audio_bytes = STANDARD
         .decode(request.audio_base64.as_bytes())
@@ -489,7 +509,7 @@ async fn desktop_transcribe_audio(request: DesktopTranscriptionRequest) -> Resul
 
     let response = openai_client()?
         .post(format!("{OPENAI_API_BASE}/audio/transcriptions"))
-        .bearer_auth(request.api_key)
+        .bearer_auth(api_key)
         .multipart(
             Form::new()
                 .part("file", audio_part)
@@ -509,7 +529,7 @@ async fn desktop_transcribe_audio(request: DesktopTranscriptionRequest) -> Resul
 
 #[tauri::command]
 async fn desktop_text_to_speech(request: DesktopSpeechRequest) -> Result<String, String> {
-    ensure_api_key(&request.api_key)?;
+    let api_key = resolve_api_key()?;
 
     if request.text.trim().is_empty() {
         return Err(String::from("Text is required."));
@@ -517,7 +537,7 @@ async fn desktop_text_to_speech(request: DesktopSpeechRequest) -> Result<String,
 
     let response = openai_client()?
         .post(format!("{OPENAI_API_BASE}/audio/speech"))
-        .bearer_auth(request.api_key)
+        .bearer_auth(api_key)
         .json(&json!({
             "model": "tts-1",
             "voice": request.voice,
@@ -543,7 +563,7 @@ async fn desktop_text_to_speech(request: DesktopSpeechRequest) -> Result<String,
 async fn desktop_summarize_document(
     request: DesktopDocumentSummaryRequest,
 ) -> Result<DesktopDocumentSummaryResponse, String> {
-    ensure_api_key(&request.api_key)?;
+    let api_key = resolve_api_key()?;
 
     if request.extracted_text.trim().is_empty() {
         return Err(String::from("This file did not contain readable text."));
@@ -566,7 +586,7 @@ async fn desktop_summarize_document(
 
     let response = openai_client()?
         .post(format!("{OPENAI_API_BASE}/chat/completions"))
-        .bearer_auth(request.api_key)
+        .bearer_auth(api_key)
         .json(&payload)
         .send()
         .await
@@ -577,6 +597,41 @@ async fn desktop_summarize_document(
         .ok_or_else(|| String::from("NovaMind returned an empty document summary."))?;
 
     Ok(DesktopDocumentSummaryResponse { summary, truncated })
+}
+
+#[tauri::command]
+async fn desktop_generate_image(request: DesktopImageGenerationRequest) -> Result<String, String> {
+    let api_key = resolve_api_key()?;
+
+    if request.prompt.trim().is_empty() {
+        return Err(String::from("An image prompt is required."));
+    }
+
+    let payload = json!({
+        "model": request.model.unwrap_or_else(|| String::from("gpt-image-1")),
+        "prompt": request.prompt,
+        "size": request.size.unwrap_or_else(|| String::from("1024x1024")),
+    });
+
+    let response = openai_client()?
+        .post(format!("{OPENAI_API_BASE}/images/generations"))
+        .bearer_auth(api_key)
+        .json(&payload)
+        .send()
+        .await
+        .map_err(humanize_transport_error)?;
+
+    let json = parse_openai_json(response).await?;
+    let image_base64 = json
+        .get("data")
+        .and_then(Value::as_array)
+        .and_then(|items| items.first())
+        .and_then(|item| item.get("b64_json"))
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| String::from("NovaMind returned an empty image response."))?;
+
+    Ok(format!("data:image/png;base64,{image_base64}"))
 }
 
 #[tauri::command]
@@ -618,14 +673,60 @@ fn desktop_prepare_file_preview(
     })
 }
 
-fn ensure_api_key(api_key: &str) -> Result<(), String> {
-    if api_key.trim().is_empty() {
-        return Err(String::from(
-            "Add your OpenAI API key in Settings to use the desktop app.",
-        ));
+#[tauri::command]
+fn desktop_save_agent_file(
+    request: DesktopSaveAgentFileRequest,
+) -> Result<DesktopSaveAgentFileResponse, String> {
+    if request.content.trim().is_empty()
+        && request
+            .content_base64
+            .as_ref()
+            .map(|value| value.trim().is_empty())
+            .unwrap_or(true)
+    {
+        return Err(String::from("Generated content is empty."));
     }
 
-    Ok(())
+    let filename = sanitize_agent_filename(&request.filename)?;
+    let _mime_type = request.mime_type.as_deref();
+    let desktop = desktop_dir().ok_or_else(|| String::from("Could not locate the Desktop folder."))?;
+    let path = desktop.join(&filename);
+    let bytes = if let Some(content_base64) = request.content_base64 {
+        STANDARD
+            .decode(content_base64.as_bytes())
+            .map_err(|_| String::from("Failed to decode generated file bytes."))?
+    } else {
+        request.content.into_bytes()
+    };
+    fs::write(&path, bytes)
+        .map_err(|error| format!("Failed to save the file to Desktop: {error}"))?;
+    let bytes = fs::metadata(&path)
+        .map_err(|error| format!("Saved file could not be verified: {error}"))?
+        .len();
+
+    Ok(DesktopSaveAgentFileResponse {
+        filename,
+        path: path.to_string_lossy().to_string(),
+        bytes,
+    })
+}
+
+fn resolve_api_key() -> Result<String, String> {
+    if let Ok(api_key) = std::env::var("OPENAI_API_KEY") {
+        if !api_key.trim().is_empty() {
+            return Ok(api_key);
+        }
+    }
+
+    if let Some(api_key) = option_env!("NOVAMIND_OPENAI_API_KEY") {
+        if !api_key.trim().is_empty() {
+            return Ok(api_key.to_string());
+        }
+    }
+
+    Err(String::from(
+        "Protected NovaMind AI access is not configured. Add OPENAI_API_KEY to the protected runtime before packaging the app.",
+    ))
 }
 
 fn openai_client() -> Result<reqwest::Client, String> {
@@ -862,6 +963,58 @@ fn bytes_to_preview_text(bytes: &[u8], limit: usize) -> (String, bool) {
     )
 }
 
+fn desktop_dir() -> Option<PathBuf> {
+    std::env::var_os("USERPROFILE")
+        .map(PathBuf::from)
+        .map(|path| path.join("Desktop"))
+        .filter(|path| path.exists())
+        .or_else(|| {
+            std::env::var_os("HOME")
+                .map(PathBuf::from)
+                .map(|path| path.join("Desktop"))
+                .filter(|path| path.exists())
+        })
+}
+
+fn sanitize_agent_filename(filename: &str) -> Result<String, String> {
+    let mut cleaned = filename
+        .chars()
+        .map(|character| match character {
+            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' => '-',
+            character if character.is_control() => '-',
+            character => character,
+        })
+        .collect::<String>()
+        .trim()
+        .trim_matches('.')
+        .to_string();
+
+    while cleaned.contains("--") {
+        cleaned = cleaned.replace("--", "-");
+    }
+
+    if cleaned.is_empty() {
+        cleaned = String::from("novamind-output.md");
+    }
+
+    if cleaned.len() > 120 {
+        cleaned.truncate(120);
+    }
+
+    let extension = Path::new(&cleaned)
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(|value| value.to_lowercase())
+        .unwrap_or_default();
+
+    match extension.as_str() {
+        "txt" | "md" | "json" | "pdf" | "docx" | "csv" | "html" | "xlsx" | "pptx" => Ok(cleaned),
+        _ => Err(String::from(
+            "NovaMind can save .txt, .md, .json, .pdf, .docx, .csv, .html, .xlsx, and .pptx files.",
+        )),
+    }
+}
+
 fn build_system_prompt(
     mode: AssistantMode,
     command: Option<SmartCommand>,
@@ -928,7 +1081,9 @@ pub fn run() {
             desktop_transcribe_audio,
             desktop_text_to_speech,
             desktop_summarize_document,
-            desktop_prepare_file_preview
+            desktop_generate_image,
+            desktop_prepare_file_preview,
+            desktop_save_agent_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running NovaMind AI");

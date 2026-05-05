@@ -17,7 +17,7 @@ async function extractLocalDocumentText(file: File) {
   }
 
   throw new Error(
-    "The built-in desktop mode supports TXT, MD, and DOCX files. Use a custom API URL for PDF support."
+    "The current protected desktop pipeline supports TXT, MD, and DOCX files. PDF support is coming next."
   );
 }
 

@@ -12,12 +12,14 @@ export interface AppText {
   builtInDesktopAiDescription: string;
   captureScreen: string;
   capturedScreenAlt: string;
+  chat: string;
   clearSelection: string;
   close: string;
   compactDesktop: string;
   compactSettings: string;
   copyCode: string;
   copyMessage: string;
+  createImage: string;
   currentModelCatalog: string;
   customApiUrl: string;
   customApiUrlDescription: string;
@@ -25,14 +27,18 @@ export interface AppText {
   dark: string;
   deleteChat: string;
   desktopAiUnavailable: string;
+  downloadImage: string;
   dragToAnalyze: string;
+  editMessage: string;
   emptyChatDescription: string;
   emptyChatTitle: string;
   enterAnotherModelId: string;
   errorPrefix: string;
   fileReadyToSend: string;
+  imagesLibrary: string;
   language: string;
   light: string;
+  memory: string;
   messages: string;
   microphoneAccessFailed: string;
   inputDevice: string;
@@ -40,7 +46,11 @@ export interface AppText {
   inputVolume: string;
   defaultDevice: string;
   outputDeviceUnsupported: string;
+  noImagesYet: string;
   model: string;
+  betaVersion: string;
+  protectedAiLayer: string;
+  protectedAiLayerDescription: string;
   modelPickerDescription: string;
   modelPickerTitle: string;
   newChat: string;
@@ -72,17 +82,26 @@ export interface AppText {
   liveScreenSessionOnly: string;
   screenSelectionDescription: string;
   screenSelectionTitle: string;
+  searchChats: string;
+  searchNoResults: string;
+  searchNoResultsTitle: string;
+  searchNoResultsDescription: string;
   selectModel: string;
   send: string;
   settings: string;
   sizeLabel: string;
   speakResponse: string;
   startByTyping: string;
+  stopGenerating: string;
   stopRecording: string;
   supportedFileError: string;
   systemPrompt: string;
+  tasks: string;
   temperature: string;
   theme: string;
+  tools: string;
+  additionalTools: string;
+  moreToolsSoon: string;
   transcribing: string;
   tryAnotherModel: string;
   terminalAllow: string;
@@ -145,7 +164,9 @@ export interface AppText {
   voiceInputError: string;
   voiceMode: string;
   whatShouldFocus: string;
+  webSearch: string;
   writeMessage: string;
+  imageGenerated: string;
   preview: string;
   previewUnavailable: string;
 }
@@ -163,12 +184,14 @@ const textByLanguage: Record<AppLanguage, AppText> = {
     builtInDesktopAiDescription: "Required for the built-in desktop AI. The key stays on this device.",
     captureScreen: "Capture Screen",
     capturedScreenAlt: "Captured screen",
+    chat: "Chat",
     clearSelection: "Clear Selection",
     close: "Close",
     compactDesktop: "Compact Desktop",
     compactSettings: "Compact app controls",
     copyCode: "Copy code",
     copyMessage: "Copy message",
+    createImage: "Create image",
     currentModelCatalog: "Choose from the current GPT catalog or type your own model ID below.",
     customApiUrl: "Custom API URL (optional)",
     customApiUrlDescription: "Custom NovaMind API URL is active.",
@@ -176,14 +199,18 @@ const textByLanguage: Record<AppLanguage, AppText> = {
     dark: "Dark",
     deleteChat: "Delete chat",
     desktopAiUnavailable: "Desktop AI commands are only available inside the app.",
+    downloadImage: "Download image",
     dragToAnalyze: "Drag a rectangle over the captured screen to analyze a specific region.",
+    editMessage: "Edit message",
     emptyChatDescription: "Write a prompt and keep everything in one clean chat flow.",
     emptyChatTitle: "Start chatting with NovaMind",
     enterAnotherModelId: "Enter another model ID",
     errorPrefix: "Error",
     fileReadyToSend: "This file will be sent with your next message.",
+    imagesLibrary: "Images",
     language: "Language",
     light: "Light",
+    memory: "Memory",
     messages: "messages",
     microphoneAccessFailed: "Microphone access failed.",
     inputDevice: "Input device",
@@ -191,7 +218,12 @@ const textByLanguage: Record<AppLanguage, AppText> = {
     inputVolume: "Input volume",
     defaultDevice: "System default",
     outputDeviceUnsupported: "Output device selection is not supported in this environment.",
+    noImagesYet: "Generated images will appear here.",
     model: "Model",
+    betaVersion: "Beta Version",
+    protectedAiLayer: "Protected AI layer",
+    protectedAiLayerDescription:
+      "NovaMind now routes requests through protected backend channels. API secrets are no longer configured from the UI.",
     modelPickerDescription: "Choose from the current GPT catalog or type your own model ID below.",
     modelPickerTitle: "Select a model",
     newChat: "New chat",
@@ -224,18 +256,28 @@ const textByLanguage: Record<AppLanguage, AppText> = {
     screenSelectionDescription:
       "Capture the current display, then draw a region over the preview. NovaMind will send that cropped image to the vision model and explain what it sees.",
     screenSelectionTitle: "Screen selection tool",
+    searchChats: "Search chats and messages...",
+    searchNoResults: "No conversations match this search yet.",
+    searchNoResultsTitle: "No messages found",
+    searchNoResultsDescription:
+      "Try another keyword or clear the search to see the full conversation again.",
     selectModel: "Select a model",
     send: "Send",
     settings: "Settings",
     sizeLabel: "Size",
     speakResponse: "Speak response",
-    startByTyping: "Message NovaMind...",
+    startByTyping: "Ask NovaMind...",
+    stopGenerating: "Stop",
     stopRecording: "Stop recording",
     supportedFileError:
-      "The built-in desktop mode supports TXT, MD, and DOCX files. Use a custom API URL for PDF support.",
+      "The current protected desktop pipeline supports TXT, MD, and DOCX files. PDF support is coming next.",
     systemPrompt: "System prompt",
+    tasks: "Tasks",
     temperature: "Temperature",
     theme: "Theme",
+    tools: "Tools",
+    additionalTools: "Additional tools",
+    moreToolsSoon: "More NovaMind tools will appear here soon.",
     transcribing: "Transcribing...",
     tryAnotherModel: "If your model is unavailable for this key, try gpt-4o-mini.",
     terminalAllow: "Allow",
@@ -298,7 +340,9 @@ const textByLanguage: Record<AppLanguage, AppText> = {
     voiceInputError: "Voice transcription failed.",
     voiceMode: "Talk to NovaMind",
     whatShouldFocus: "What should NovaMind focus on?",
+    webSearch: "Web search",
     writeMessage: "Write a prompt and keep everything in one clean chat flow.",
+    imageGenerated: "Here is your generated image.",
     preview: "Preview",
     previewUnavailable: "Preview unavailable for this file."
   },
@@ -314,12 +358,14 @@ const textByLanguage: Record<AppLanguage, AppText> = {
     builtInDesktopAiDescription: "Dahili masaustu AI icin gerekir. Anahtar bu cihazda kalir.",
     captureScreen: "Ekrani yakala",
     capturedScreenAlt: "Yakalanan ekran",
+    chat: "Sohbet",
     clearSelection: "Secimi temizle",
     close: "Kapat",
     compactDesktop: "Kompakt Masaustu",
     compactSettings: "Kompakt uygulama ayarlari",
     copyCode: "Kodu kopyala",
     copyMessage: "Mesaji kopyala",
+    createImage: "Gorsel olustur",
     currentModelCatalog: "Guncel GPT katalogundan secin veya kendi model kimliginizi yazin.",
     customApiUrl: "Ozel API URL'si (opsiyonel)",
     customApiUrlDescription: "Ozel NovaMind API URL'si aktif.",
@@ -327,14 +373,18 @@ const textByLanguage: Record<AppLanguage, AppText> = {
     dark: "Koyu",
     deleteChat: "Sohbeti sil",
     desktopAiUnavailable: "Masaustu AI komutlari yalnizca uygulama icinde kullanilabilir.",
+    downloadImage: "Gorseli indir",
     dragToAnalyze: "Belirli bir bolgeyi analiz etmek icin yakalanan ekran uzerinde bir alan surukleyin.",
+    editMessage: "Mesaji duzenle",
     emptyChatDescription: "Bir istem yazin ve her seyi tek bir temiz sohbet akisinda yonetin.",
     emptyChatTitle: "NovaMind ile sohbete basla",
     enterAnotherModelId: "Baska bir model kimligi girin",
     errorPrefix: "Hata",
     fileReadyToSend: "Bu dosya bir sonraki mesajinizla birlikte gonderilecek.",
+    imagesLibrary: "Gorseller",
     language: "Dil",
     light: "Acik",
+    memory: "Hafiza",
     messages: "mesaj",
     microphoneAccessFailed: "Mikrofon erisimi basarisiz oldu.",
     inputDevice: "Giris cihazi",
@@ -342,7 +392,12 @@ const textByLanguage: Record<AppLanguage, AppText> = {
     inputVolume: "Giris seviyesi",
     defaultDevice: "Sistem varsayilani",
     outputDeviceUnsupported: "Bu ortamda cikis cihazi secimi desteklenmiyor.",
+    noImagesYet: "Olusturulan gorseller burada gorunecek.",
     model: "Model",
+    betaVersion: "Beta Surum",
+    protectedAiLayer: "Korumali AI katmani",
+    protectedAiLayerDescription:
+      "NovaMind artik istekleri korumali backend kanallarindan gecirir. API gizli bilgileri arayuzden ayarlanmaz.",
     modelPickerDescription: "Guncel GPT katalogundan secin veya kendi model kimliginizi yazin.",
     modelPickerTitle: "Model secin",
     newChat: "Yeni sohbet",
@@ -375,18 +430,28 @@ const textByLanguage: Record<AppLanguage, AppText> = {
     screenSelectionDescription:
       "Mevcut ekrani yakalayin, sonra onizleme uzerinde bir bolge cizin. NovaMind bu kirpilmis goruntuyu vision modele gonderip gordugunu aciklar.",
     screenSelectionTitle: "Ekran secim araci",
+    searchChats: "Sohbet ve mesajlarda ara...",
+    searchNoResults: "Bu aramaya uyan sohbet bulunamadi.",
+    searchNoResultsTitle: "Mesaj bulunamadi",
+    searchNoResultsDescription:
+      "Farkli bir anahtar kelime deneyin veya tam konusmayi gormek icin aramayi temizleyin.",
     selectModel: "Model secin",
     send: "Gonder",
     settings: "Ayarlar",
     sizeLabel: "Boyut",
     speakResponse: "Yaniti seslendir",
-    startByTyping: "NovaMind'e mesaj yaz...",
+    startByTyping: "NovaMind'e sor...",
+    stopGenerating: "Durdur",
     stopRecording: "Kaydi durdur",
     supportedFileError:
-      "Dahili masaustu modunda TXT, MD ve DOCX desteklenir. PDF icin ozel API URL'si kullanin.",
+      "Mevcut korumali masaustu hatti su an TXT, MD ve DOCX destekler. PDF destegi yakinda gelecek.",
     systemPrompt: "Sistem istemi",
+    tasks: "Gorevler",
     temperature: "Sicaklik",
     theme: "Tema",
+    tools: "Araclar",
+    additionalTools: "Ek araclar",
+    moreToolsSoon: "Yakinda burada daha fazla NovaMind araci olacak.",
     transcribing: "Yaziya cevriliyor...",
     tryAnotherModel: "Bu anahtar icin model kullanilamiyorsa gpt-4o-mini deneyin.",
     terminalAllow: "Izin ver",
@@ -449,7 +514,9 @@ const textByLanguage: Record<AppLanguage, AppText> = {
     voiceInputError: "Ses donusumu basarisiz oldu.",
     voiceMode: "NovaMind ile konus",
     whatShouldFocus: "NovaMind neye odaklanmali?",
+    webSearch: "Web aramasi",
     writeMessage: "Bir istem yazin ve her seyi tek bir temiz sohbet akisinda yonetin.",
+    imageGenerated: "Olusturulan gorsel burada.",
     preview: "Onizleme",
     previewUnavailable: "Bu dosya icin onizleme kullanilamiyor."
   }

@@ -9,7 +9,6 @@ interface DesktopChatMessageInput {
 }
 
 interface DesktopChatRequest {
-  apiKey: string;
   mode: ChatMode;
   messages: DesktopChatMessageInput[];
   model: ModelName;
@@ -29,30 +28,45 @@ interface DesktopChatStreamEvent {
 }
 
 interface DesktopScreenRequest {
-  apiKey: string;
   imageDataUrl: string;
   prompt: string;
   model: ModelName;
 }
 
 interface DesktopSpeechRequest {
-  apiKey: string;
   text: string;
   voice: TtsVoice;
 }
 
 interface DesktopTranscriptionRequest {
-  apiKey: string;
   audioBase64: string;
   mimeType: string;
   fileName: string;
 }
 
 interface DesktopDocumentSummaryRequest {
-  apiKey: string;
   fileName: string;
   extractedText: string;
   model: ModelName;
+}
+
+interface DesktopImageGenerationRequest {
+  prompt: string;
+  model?: string;
+  size?: "1024x1024" | "1536x1024" | "1024x1536";
+}
+
+interface DesktopSaveAgentFileRequest {
+  filename: string;
+  content: string;
+  contentBase64?: string;
+  mimeType?: string;
+}
+
+interface DesktopSaveAgentFileResponse {
+  filename: string;
+  path: string;
+  bytes: number;
 }
 
 interface DesktopDocumentSummaryResponse {
@@ -101,13 +115,9 @@ export async function invokeDesktop<T>(command: string, args?: Record<string, un
   }
 }
 
-function requireDesktopApiKey(apiKey: string) {
+function ensureDesktopAvailable() {
   if (!isTauri()) {
     throw new Error("Desktop AI commands are only available inside the app.");
-  }
-
-  if (!apiKey.trim()) {
-    throw new Error("Add your OpenAI API key in Settings to use the desktop app.");
   }
 }
 
@@ -137,7 +147,7 @@ async function blobToDataUrl(blob: Blob) {
 }
 
 export async function desktopChatCompletion(request: DesktopChatRequest) {
-  requireDesktopApiKey(request.apiKey);
+  ensureDesktopAvailable();
   return invokeDesktop<string>("desktop_chat_completion", { request });
 }
 
@@ -154,7 +164,7 @@ export async function desktopChatCompletionStream(
     onDelta: (chunk: string) => void;
   }
 ) {
-  requireDesktopApiKey(request.apiKey);
+  ensureDesktopAvailable();
 
   const streamId = crypto.randomUUID();
 
@@ -229,17 +239,16 @@ export async function desktopChatCompletionStream(
 }
 
 export async function desktopAnalyzeScreen(request: DesktopScreenRequest) {
-  requireDesktopApiKey(request.apiKey);
+  ensureDesktopAvailable();
   return invokeDesktop<string>("desktop_analyze_screen", { request });
 }
 
-export async function desktopTranscribeAudio(apiKey: string, audio: Blob) {
-  requireDesktopApiKey(apiKey);
+export async function desktopTranscribeAudio(audio: Blob) {
+  ensureDesktopAvailable();
   const audioDataUrl = await blobToDataUrl(audio);
 
   return invokeDesktop<string>("desktop_transcribe_audio", {
     request: {
-      apiKey,
       audioBase64: stripDataUrlPrefix(audioDataUrl),
       mimeType: audio.type || "audio/webm",
       fileName: "recording.webm"
@@ -247,11 +256,10 @@ export async function desktopTranscribeAudio(apiKey: string, audio: Blob) {
   });
 }
 
-export async function desktopRequestSpeech(apiKey: string, text: string, voice: TtsVoice) {
-  requireDesktopApiKey(apiKey);
+export async function desktopRequestSpeech(text: string, voice: TtsVoice) {
+  ensureDesktopAvailable();
   const audioBase64 = await invokeDesktop<string>("desktop_text_to_speech", {
     request: {
-      apiKey,
       text,
       voice
     } satisfies DesktopSpeechRequest
@@ -273,15 +281,16 @@ async function extractBuiltinDocumentText(file: File) {
     return result.value.trim();
   }
 
-  throw new Error("The built-in desktop mode supports TXT, MD, and DOCX files. Use a custom API URL for PDF support.");
+  throw new Error(
+    "The current protected desktop pipeline supports TXT, MD, and DOCX files. PDF support is coming next."
+  );
 }
 
 export async function desktopSummarizeDocument(
-  apiKey: string,
   file: File,
   model: ModelName
 ) {
-  requireDesktopApiKey(apiKey);
+  ensureDesktopAvailable();
   const extractedText = await extractBuiltinDocumentText(file);
 
   if (!extractedText.trim()) {
@@ -290,7 +299,6 @@ export async function desktopSummarizeDocument(
 
   const result = await invokeDesktop<DesktopDocumentSummaryResponse>("desktop_summarize_document", {
     request: {
-      apiKey,
       fileName: file.name,
       extractedText,
       model
@@ -306,4 +314,30 @@ export async function desktopSummarizeDocument(
     truncated: result.truncated,
     createdAt: new Date().toISOString()
   };
+}
+
+export async function desktopGenerateImage(
+  prompt: string,
+  options?: {
+    model?: string;
+    size?: "1024x1024" | "1536x1024" | "1024x1536";
+  }
+) {
+  ensureDesktopAvailable();
+
+  return invokeDesktop<string>("desktop_generate_image", {
+    request: {
+      prompt,
+      model: options?.model,
+      size: options?.size
+    } satisfies DesktopImageGenerationRequest
+  });
+}
+
+export async function desktopSaveAgentFile(request: DesktopSaveAgentFileRequest) {
+  ensureDesktopAvailable();
+
+  return invokeDesktop<DesktopSaveAgentFileResponse>("desktop_save_agent_file", {
+    request
+  });
 }
